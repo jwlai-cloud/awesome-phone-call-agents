@@ -1,0 +1,69 @@
+{
+  "_comment": [
+    "Authored by hand, never captured. SECURITY.md forbids committing call recordings",
+    "and private call transcripts, so fixtures are written from what a clinician says",
+    "these calls sound like. Keyed by patient id."
+  ],
+  "p_ivy": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": 0.94,
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "will_attend",
+      "chosen_slot_id": "s1",
+      "barrier": "work_or_childcare",
+      "symptom_volunteered": "no",
+      "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works."
+    }
+  },
+  "p_omar": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": 0.88,
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "cannot_attend",
+      "chosen_slot_id": "none",
+      "barrier": "transport",
+      "symptom_volunteered": "no",
+      "evidence_summary": "No lift to the clinic since the bus route changed; neither offered time helps."
+    }
+  },
+  "p_rosa": {
+    "status": "COMPLETED",
+    "task_completed": false,
+    "completion_confidence": 0.71,
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "undecided",
+      "chosen_slot_id": "unknown",
+      "barrier": "health_concern",
+      "symptom_volunteered": "yes",
+      "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely."
+    }
+  },
+  "p_wu": {
+    "status": "VOICEMAIL",
+    "task_completed": false,
+    "completion_confidence": 0.0,
+    "structured_result": null
+  },
+  "p_kai": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": 0.91,
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "considers_course_finished",
+      "chosen_slot_id": "none",
+      "barrier": "feels_better",
+      "symptom_volunteered": "no",
+      "evidence_summary": "Considers the course done and would like that confirmed by a person."
+    }
+  }
+}
