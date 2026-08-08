@@ -228,3 +228,52 @@ def test_a_failing_call_does_not_end_the_course(course_file: CourseFile) -> None
     assert len(failed) == 1
     assert "provider unreachable" in (failed[0].note or "")
     assert port.calls > 1, "the run must continue past the failure"
+
+
+# --- transcripts ----------------------------------------------------------------
+
+
+def test_transcript_turns_are_normalised_and_redacted() -> None:
+    from rehab_adherence.calle import normalize_transcript
+
+    turns = normalize_transcript(
+        [
+            {"speaker": "bot", "text": "  Ring us on +1 555 010 1000  ", "ts": "00:00:00"},
+            {"speaker": "USER", "text": "ok", "ts": "00:00:04"},
+            {"speaker": "SUPERVISOR", "text": "joining", "ts": "00:00:09"},
+            {"speaker": "BOT", "text": "   "},
+            "not a dict",
+            {"speaker": "BOT"},
+        ]
+    )
+    assert [t["speaker"] for t in turns] == ["BOT", "USER", "OTHER"]
+    assert "5550101000" not in turns[0]["text"], "phone-shaped text must be redacted"
+    assert turns[0]["text"].startswith("Ring us on"), "whitespace is collapsed, not the sentence"
+    assert turns[1]["ts"] == "00:00:04"
+
+
+def test_transcript_render_shows_the_refusal(course_file: CourseFile) -> None:
+    """Rosa raises a symptom. The rendered call must show the refusal and the
+    escalation, because that is the shot the demo is built around."""
+    from rehab_adherence.report import render_transcript
+
+    responses = json.loads(RESPONSES.read_text(encoding="utf-8"))
+    rows = run(course_file, TODAY, FixturePort(responses))
+    rosa = next(row for row in rows if row.patient_id == "p_rosa")
+
+    text = render_transcript(rosa)
+    assert "agent" in text and "patient" in text
+    assert "not able to advise" in text
+    assert "ESCALATED TO CLINICIAN" in text
+    assert rosa.masked_phone in text
+    for patient in course_file.patients:
+        assert patient.phone_e164 not in text
+
+
+def test_transcript_render_handles_a_call_with_no_transcript(course_file: CourseFile) -> None:
+    from rehab_adherence.report import render_transcript
+
+    responses = json.loads(RESPONSES.read_text(encoding="utf-8"))
+    rows = run(course_file, TODAY, FixturePort(responses))
+    wu = next(row for row in rows if row.patient_id == "p_wu")
+    assert "no transcript returned" in render_transcript(wu)

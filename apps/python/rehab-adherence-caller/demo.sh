@@ -91,10 +91,10 @@ run "python3 -m rehab_adherence run --course $COURSE --fixture $RESPONSES --toda
 pause 6
 
 clear
-say "# Rosa mentioned a symptom. She was escalated, not rebooked."
+say "# What was actually said. CALL-E returns the conversation, speaker-tagged."
 pause 1
-run "python3 -m rehab_adherence run --course $COURSE --fixture $RESPONSES --today $TODAY | grep -A4 p_rosa"
-pause 5
+run "python3 -m rehab_adherence run --course $COURSE --fixture $RESPONSES --today $TODAY --transcripts 2>/dev/null | sed -n '/CALL  p_rosa/,/ESCALATED/p'"
+pause 7
 
 clear
 say "# And the whole thing is tested without credentials."

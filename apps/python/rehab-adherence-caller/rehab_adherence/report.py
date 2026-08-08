@@ -66,6 +66,50 @@ def render(rows: list[Row], *, banner: str, course_id: str, today: str) -> str:
     return "\n".join(lines)
 
 
+def render_transcript(row: Row, *, width: int = 72) -> str:
+    """Render one call as turns.
+
+    CALL-E returns the conversation speaker-tagged, so the whole exchange can be
+    shown as text. Nothing here needs audio, and nothing here needs the call to
+    still be running.
+    """
+    turns = row.transcript or []
+    if not turns:
+        return f"{row.patient_id}: no transcript returned (status={row.status})"
+
+    lines = [
+        f"CALL  {row.patient_id}  {row.masked_phone}  [{row.trajectory} / {row.action}]",
+        "-" * width,
+    ]
+    for turn in turns:
+        who = {"BOT": "agent  ", "USER": "patient", "OTHER": "other  "}.get(turn["speaker"], "other  ")
+        stamp = f"{turn['ts']:>8}  " if turn.get("ts") else ""
+        body = _wrap(turn["text"], width - len(stamp) - 9)
+        lines.append(f"{stamp}{who}  {body[0]}")
+        pad = " " * (len(stamp) + 9)
+        lines.extend(f"{pad}{line}" for line in body[1:])
+    lines.append("-" * width)
+    lines.append(f"outcome: {row.outcome}    status: {row.status}")
+    if row.escalate_to_clinician:
+        lines.append(">>> ESCALATED TO CLINICIAN -- not rebooked by this application")
+    return "\n".join(lines)
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    if width < 20:
+        width = 20
+    words, lines, current = text.split(), [], ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if len(candidate) <= width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines or [""]
+
+
 def write_jsonl(path: Path, rows: list[Row]) -> None:
     """Durable output, one JSON object per patient. Never contains a full phone
     number, because `Row` only ever carries the masked form."""

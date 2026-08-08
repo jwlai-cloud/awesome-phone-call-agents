@@ -36,6 +36,7 @@ class Row:
     call_id: str | None = None
     simulated: bool | None = None
     reference: str | None = None
+    transcript: list[dict[str, str]] | None = None
     signals: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -137,6 +138,7 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
                     "note": reading.note,
                     "call_id": result.get("call_id"),
                     "simulated": result.get("simulated"),
+                    "transcript": result.get("transcript") or [],
                 }
             )
         )

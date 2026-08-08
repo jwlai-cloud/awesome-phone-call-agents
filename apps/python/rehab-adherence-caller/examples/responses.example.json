@@ -2,7 +2,8 @@
   "_comment": [
     "Authored by hand, never captured. SECURITY.md forbids committing call recordings",
     "and private call transcripts, so fixtures are written from what a clinician says",
-    "these calls sound like. Keyed by patient id."
+    "these calls sound like. Keyed by patient id.",
+    "Transcripts are invented dialogue for fictional patients, not recordings."
   ],
   "p_ivy": {
     "status": "COMPLETED",
@@ -16,7 +17,34 @@
       "barrier": "work_or_childcare",
       "symptom_volunteered": "no",
       "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works."
-    }
+    },
+    "transcript": [
+      {
+        "speaker": "BOT",
+        "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy. Your reference is RBP-CE9F41. If you would rather check this is genuine, hang up and ring the clinic on the number published on their website, and quote that reference.",
+        "ts": "00:00:00"
+      },
+      {
+        "speaker": "USER",
+        "text": "No, that's fine, I know who you are.",
+        "ts": "00:00:07"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Thank you. Ivy missed a session last week and the clinic has kept her place. I can offer Thursday the thirteenth at two in the afternoon, or Tuesday the eighteenth at half past nine.",
+        "ts": "00:00:14"
+      },
+      {
+        "speaker": "USER",
+        "text": "Thursday afternoon is good. Last week clashed with a shift.",
+        "ts": "00:00:21"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Thursday the thirteenth at two, booked. Please bring shorts and your exercise sheet. Thank you.",
+        "ts": "00:00:28"
+      }
+    ]
   },
   "p_omar": {
     "status": "COMPLETED",
@@ -30,7 +58,44 @@
       "barrier": "transport",
       "symptom_volunteered": "no",
       "evidence_summary": "No lift to the clinic since the bus route changed; neither offered time helps."
-    }
+    },
+    "transcript": [
+      {
+        "speaker": "BOT",
+        "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-2A7D08.",
+        "ts": "00:00:00"
+      },
+      {
+        "speaker": "USER",
+        "text": "Right, okay.",
+        "ts": "00:00:07"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Omar missed a session recently. Can I ask what is making it hard to get to the clinic?",
+        "ts": "00:00:14"
+      },
+      {
+        "speaker": "USER",
+        "text": "There's no bus any more since they changed the route. I've got no way of getting there.",
+        "ts": "00:00:21"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Thank you, I have noted that transport is the difficulty. I can offer Thursday the thirteenth at two, or Tuesday the eighteenth at half past nine. Would either work?",
+        "ts": "00:00:28"
+      },
+      {
+        "speaker": "USER",
+        "text": "Neither, really. It's not the time, it's getting there at all.",
+        "ts": "00:00:35"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Understood, I will not book anything. A clinician can call you back to talk it through if that would help. Thank you for your time.",
+        "ts": "00:00:42"
+      }
+    ]
   },
   "p_rosa": {
     "status": "COMPLETED",
@@ -44,7 +109,44 @@
       "barrier": "health_concern",
       "symptom_volunteered": "yes",
       "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely."
-    }
+    },
+    "transcript": [
+      {
+        "speaker": "BOT",
+        "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-646B83.",
+        "ts": "00:00:00"
+      },
+      {
+        "speaker": "USER",
+        "text": "Yes, hello.",
+        "ts": "00:00:07"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Rosa has missed some sessions recently. Can I ask what is making it hard to attend?",
+        "ts": "00:00:14"
+      },
+      {
+        "speaker": "USER",
+        "text": "Honestly I've been having a bit of tightness in my chest when I walk up the hill to the clinic. Is that normal at this stage?",
+        "ts": "00:00:21"
+      },
+      {
+        "speaker": "BOT",
+        "text": "I am not able to advise on that, and I will not try. I am going to ask a clinician to call you back today rather than book anything now. Thank you for telling me.",
+        "ts": "00:00:28"
+      },
+      {
+        "speaker": "USER",
+        "text": "Alright, thank you.",
+        "ts": "00:00:35"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Someone will be in touch. Goodbye.",
+        "ts": "00:00:42"
+      }
+    ]
   },
   "p_wu": {
     "status": "VOICEMAIL",
@@ -64,6 +166,43 @@
       "barrier": "feels_better",
       "symptom_volunteered": "no",
       "evidence_summary": "Considers the course done and would like that confirmed by a person."
-    }
+    },
+    "transcript": [
+      {
+        "speaker": "BOT",
+        "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-9C21B7.",
+        "ts": "00:00:00"
+      },
+      {
+        "speaker": "USER",
+        "text": "Hello.",
+        "ts": "00:00:07"
+      },
+      {
+        "speaker": "BOT",
+        "text": "A previous call recorded that Kai stopped attending because things had improved. I am not calling to book anything. Does Kai consider the course finished?",
+        "ts": "00:00:14"
+      },
+      {
+        "speaker": "USER",
+        "text": "Yes, I think so. It sorted itself out.",
+        "ts": "00:00:21"
+      },
+      {
+        "speaker": "BOT",
+        "text": "Thank you. Would you like a clinician to confirm that with you, so it is recorded properly?",
+        "ts": "00:00:28"
+      },
+      {
+        "speaker": "USER",
+        "text": "That would be good, yes.",
+        "ts": "00:00:35"
+      },
+      {
+        "speaker": "BOT",
+        "text": "I will arrange that. Goodbye.",
+        "ts": "00:00:42"
+      }
+    ]
   }
 }

@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 44 tests, no credentials, no network
+python3 -m pytest -q                       # 47 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -74,6 +74,37 @@ python3 -m rehab_adherence run --course examples/course.example.json \
 The shipped fixture covers a booking, a patient with no transport, a voicemail,
 a patient who considers the course finished, and a patient who raises a health
 concern and is escalated instead of rebooked.
+
+To see what was actually said on each call, add `--transcripts`:
+
+```bash
+python3 -m rehab_adherence run --course examples/course.example.json \
+  --fixture examples/responses.example.json --today 2026-08-11 --transcripts
+```
+
+CALL-E returns the conversation speaker-tagged as `{speaker, text, ts}`, so the
+whole exchange can be shown as text — no audio capture, no recording. Add
+`--replay-delay 0.4` to print it one line at a time, which is how the demo is
+filmed.
+
+```text
+CALL  p_rosa  +15*******03  [disengaging / call_blocker_and_rebook]
+------------------------------------------------------------------------
+00:00:14  agent    Rosa has missed some sessions recently. Can I ask what
+                   is making it hard to attend?
+00:00:21  patient  Honestly I've been having a bit of tightness in my chest
+                   when I walk up the hill to the clinic. Is that normal at
+                   this stage?
+00:00:28  agent    I am not able to advise on that, and I will not try. I am
+                   going to ask a clinician to call you back today rather
+                   than book anything now.
+------------------------------------------------------------------------
+outcome: symptom_reported    status: COMPLETED
+>>> ESCALATED TO CLINICIAN -- not rebooked by this application
+```
+
+Phone-shaped text inside a transcript turn is redacted before it is displayed or
+written, because provider output is untrusted.
 
 Fixtures are **written by hand, never captured**: `SECURITY.md` forbids
 committing call recordings and private call transcripts, so no real call is ever

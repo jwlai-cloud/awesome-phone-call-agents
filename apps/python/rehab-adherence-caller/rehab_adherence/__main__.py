@@ -12,13 +12,29 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
 from .calle import DEFAULT_BASE_URL, FixturePort, LivePort
 from .model import CourseFile, InputError
-from .report import FIXTURE_BANNER, LIVE_BANNER, PREVIEW_BANNER, render, write_jsonl
+from .report import (
+    FIXTURE_BANNER,
+    LIVE_BANNER,
+    PREVIEW_BANNER,
+    render,
+    render_transcript,
+    write_jsonl,
+)
 from .workflow import masked_call_arguments, plan, run
+
+
+def _replay(text: str, delay: float) -> None:
+    """Print a transcript one line at a time, so a recording shows the exchange
+    unfolding instead of appearing all at once."""
+    for line in text.splitlines():
+        print(line, flush=True)
+        time.sleep(delay)
 
 
 def _today(raw: str | None) -> date:
@@ -65,6 +81,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     runner.add_argument("--base-url", default=DEFAULT_BASE_URL, help="CALL-E API base URL.")
     runner.add_argument("--output", type=Path, help="Write the ledger as JSONL to this path.")
+    runner.add_argument(
+        "--transcripts",
+        action="store_true",
+        help="Print each call as speaker-tagged turns after the ledger.",
+    )
+    runner.add_argument(
+        "--replay-delay",
+        type=float,
+        default=0.0,
+        metavar="SECONDS",
+        help="With --transcripts, pause between turns so the exchange can be read or filmed.",
+    )
     return parser
 
 
@@ -116,6 +144,16 @@ def main(argv: list[str] | None = None) -> int:
 
     rows = run(course_file, today, port)
     print(render(rows, banner=banner, course_id=course_file.course.id, today=today.isoformat()))
+
+    if args.transcripts:
+        for row in rows:
+            if not row.called:
+                continue
+            print()
+            if args.replay_delay > 0:
+                _replay(render_transcript(row), args.replay_delay)
+            else:
+                print(render_transcript(row))
     if args.output:
         write_jsonl(args.output, rows)
         print(f"\nledger written: {args.output}")

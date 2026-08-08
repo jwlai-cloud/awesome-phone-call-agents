@@ -27,6 +27,37 @@ class CallPort(Protocol):
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]: ...
 
 
+def normalize_transcript(raw: Any) -> list[dict[str, str]]:
+    """CALL-E returns turns as `{speaker, text, ts}`. Keep exactly those three
+    fields, redact anything phone-shaped, and drop anything malformed rather than
+    displaying a half-parsed turn.
+
+    Speaker is normalised to BOT/USER; anything else becomes OTHER rather than
+    being guessed at.
+    """
+    if not isinstance(raw, list):
+        return []
+    turns: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        speaker = str(item.get("speaker", "")).upper()
+        if speaker not in {"BOT", "USER"}:
+            speaker = "OTHER"
+        ts = item.get("ts")
+        turns.append(
+            {
+                "speaker": speaker,
+                "text": redact(" ".join(text.split())),
+                "ts": ts if isinstance(ts, str) else "",
+            }
+        )
+    return turns
+
+
 def redact(value: Any) -> Any:
     """Strip anything phone-shaped out of provider output before it is displayed
     or written. Provider text is untrusted; CALL-E's own skill says so."""
@@ -52,12 +83,19 @@ class FixturePort:
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]:
         response = self._responses.get(patient_id)
         if response is None:
-            return {"status": "NO_ANSWER", "structured_result": None, "call_id": None, "simulated": True}
+            return {
+                "status": "NO_ANSWER",
+                "structured_result": None,
+                "transcript": [],
+                "call_id": None,
+                "simulated": True,
+            }
         return {
             "status": response.get("status", "COMPLETED"),
             "task_completed": response.get("task_completed"),
             "completion_confidence": response.get("completion_confidence"),
             "structured_result": response.get("structured_result"),
+            "transcript": normalize_transcript(response.get("transcript")),
             "call_id": None,
             "simulated": True,
         }
@@ -91,6 +129,7 @@ class LivePort:
             "task_completed": completed.get("task_completed"),
             "completion_confidence": completed.get("completion_confidence"),
             "structured_result": redact(completed.get("structured_result")),
+            "transcript": normalize_transcript(completed.get("transcript")),
             "call_id": call_id,
             "simulated": False,
         }
