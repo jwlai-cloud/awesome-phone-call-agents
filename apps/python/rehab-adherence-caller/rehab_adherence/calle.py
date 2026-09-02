@@ -4,10 +4,22 @@ The SDK is an optional dependency, installed with the `live` extra. A default
 install cannot place a call, which is a structural guarantee rather than a
 promise: `import calle` is not merely unused in the default path, it is absent.
 
-Verified against `calle-ai==0.2.0`:
+Verified against `calle-ai==0.7.0` (signatures read from the installed package,
+response shape from https://docs.heycall-e.com/api-reference/calls):
+
     client = CalleClient(api_key=..., base_url=...)
-    created = client.calls.create(task=, recipients=, result_schema=, metadata=, idempotency_key=)
-    completed = client.calls.wait_for_result(created["id"], timeout_seconds=, interval_seconds=)
+    created = client.calls.create(task=, recipients=, result_schema=, metadata=,
+                                  idempotency_key=)
+    completed = client.calls.wait_for_result(created["id"], timeout_seconds=,
+                                             interval_seconds=)
+
+The terminal payload nests the conversation three levels down:
+
+    completed["recipients"][i]["attempts"][j]["transcript_turns"]
+        -> [{"offset_seconds": 0, "speaker": "bot"|"user"|"unknown", "text": ...}]
+
+`completion_confidence` is an object -- `{"score": 0.92, "label": "high"}` -- not
+a bare float. `evidence` is a list of short strings from the post-call summary.
 """
 
 from __future__ import annotations
@@ -19,6 +31,18 @@ PHONE_LIKE = re.compile(r"(?:\+\d[\d\s().-]{6,}\d)|(?:\b\d[\d\s().-]{7,}\d\b)")
 
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 
+# Keys our own result schema defines. Used to decide whether a structured result
+# came from our schema or is an aggregate the API produced at a different level.
+RESULT_KEYS = {
+    "reached_patient",
+    "continued_after_ai_disclosure",
+    "attendance_intent",
+    "chosen_slot_id",
+    "barrier",
+    "symptom_volunteered",
+    "evidence_summary",
+}
+
 
 class CallPort(Protocol):
     """What the workflow needs from a caller. Satisfied by the live client and by
@@ -27,18 +51,35 @@ class CallPort(Protocol):
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]: ...
 
 
-def normalize_transcript(raw: Any) -> list[dict[str, str]]:
-    """CALL-E returns turns as `{speaker, text, ts}`. Keep exactly those three
-    fields, redact anything phone-shaped, and drop anything malformed rather than
-    displaying a half-parsed turn.
+def normalize_transcript(payload: Any) -> list[dict[str, str]]:
+    """Pull the conversation out of a terminal call payload.
 
-    Speaker is normalised to BOT/USER; anything else becomes OTHER rather than
-    being guessed at.
+    The turns live at `recipients[].attempts[].transcript_turns[]`, not at the
+    top level. An earlier version of this function read a top-level "transcript"
+    key, which does not exist: it returned an empty list on every real call while
+    passing every fixture test. Read the docs, not the fixture.
+
+    Takes the last attempt that has any turns, because a redial supersedes the
+    attempt before it. Speaker is normalised to BOT/USER/OTHER; `unknown` from
+    the provider becomes OTHER rather than being guessed at. Phone-shaped text is
+    redacted -- provider output is untrusted.
     """
-    if not isinstance(raw, list):
+    if not isinstance(payload, dict):
         return []
-    turns: list[dict[str, str]] = []
-    for item in raw:
+
+    raw_turns: list[Any] = []
+    for recipient in payload.get("recipients") or []:
+        if not isinstance(recipient, dict):
+            continue
+        for attempt in recipient.get("attempts") or []:
+            if not isinstance(attempt, dict):
+                continue
+            turns = attempt.get("transcript_turns")
+            if isinstance(turns, list) and turns:
+                raw_turns = turns
+
+    normalized: list[dict[str, str]] = []
+    for item in raw_turns:
         if not isinstance(item, dict):
             continue
         text = item.get("text")
@@ -47,15 +88,48 @@ def normalize_transcript(raw: Any) -> list[dict[str, str]]:
         speaker = str(item.get("speaker", "")).upper()
         if speaker not in {"BOT", "USER"}:
             speaker = "OTHER"
-        ts = item.get("ts")
-        turns.append(
+        offset = item.get("offset_seconds")
+        stamp = ""
+        if isinstance(offset, (int, float)) and offset >= 0:
+            stamp = f"00:{int(offset) // 60:02d}:{int(offset) % 60:02d}"
+        normalized.append(
             {
                 "speaker": speaker,
                 "text": redact(" ".join(text.split())),
-                "ts": ts if isinstance(ts, str) else "",
+                "ts": stamp,
             }
         )
-    return turns
+    return normalized
+
+
+def structured_result(payload: dict[str, Any], required: set[str]) -> Any:
+    """Prefer the task-level structured result, fall back to the recipient's.
+
+    Both exist. With one recipient per call the task-level object is normally the
+    one shaped by our `result_schema`, but the API also returns a per-recipient
+    result, and an aggregate task-level schema would not carry our fields. Check
+    for a required key rather than assuming which level answered.
+    """
+    task_level = payload.get("structured_result")
+    if isinstance(task_level, dict) and required & task_level.keys():
+        return task_level
+    for recipient in payload.get("recipients") or []:
+        if isinstance(recipient, dict):
+            candidate = recipient.get("structured_result")
+            if isinstance(candidate, dict) and required & candidate.keys():
+                return candidate
+    return task_level
+
+
+def confidence_score(raw: Any) -> float | None:
+    """`completion_confidence` is `{"score": float, "label": str}`. Tolerate a
+    bare number too, since fixtures and older payloads carry one."""
+    if isinstance(raw, dict):
+        score = raw.get("score")
+        return float(score) if isinstance(score, (int, float)) else None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    return None
 
 
 def redact(value: Any) -> Any:
@@ -68,6 +142,25 @@ def redact(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: redact(item) for key, item in value.items()}
     return value
+
+
+def _read_payload(payload: dict[str, Any], *, call_id: str | None, simulated: bool) -> dict[str, Any]:
+    """Parse one terminal call payload.
+
+    Both ports go through this, so a fixture exercises exactly the parsing the
+    live path uses. When they diverged, a fixture could pass while the live call
+    silently returned nothing.
+    """
+    return {
+        "status": payload.get("status"),
+        "task_completed": payload.get("task_completed"),
+        "completion_confidence": confidence_score(payload.get("completion_confidence")),
+        "structured_result": redact(structured_result(payload, RESULT_KEYS)),
+        "transcript": normalize_transcript(payload),
+        "evidence": redact(payload.get("evidence") or []),
+        "call_id": call_id,
+        "simulated": simulated,
+    }
 
 
 class FixturePort:
@@ -90,15 +183,7 @@ class FixturePort:
                 "call_id": None,
                 "simulated": True,
             }
-        return {
-            "status": response.get("status", "COMPLETED"),
-            "task_completed": response.get("task_completed"),
-            "completion_confidence": response.get("completion_confidence"),
-            "structured_result": response.get("structured_result"),
-            "transcript": normalize_transcript(response.get("transcript")),
-            "call_id": None,
-            "simulated": True,
-        }
+        return _read_payload(response, call_id=None, simulated=True)
 
 
 class LivePort:
@@ -124,12 +209,4 @@ class LivePort:
         completed = self._client.calls.wait_for_result(
             call_id, timeout_seconds=self._timeout_seconds, interval_seconds=2
         )
-        return {
-            "status": completed.get("status"),
-            "task_completed": completed.get("task_completed"),
-            "completion_confidence": completed.get("completion_confidence"),
-            "structured_result": redact(completed.get("structured_result")),
-            "transcript": normalize_transcript(completed.get("transcript")),
-            "call_id": call_id,
-            "simulated": False,
-        }
+        return _read_payload(completed, call_id=call_id, simulated=False)

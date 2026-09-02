@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 47 tests, no credentials, no network
+python3 -m pytest -q                       # 50 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -82,8 +82,11 @@ python3 -m rehab_adherence run --course examples/course.example.json \
   --fixture examples/responses.example.json --today 2026-08-11 --transcripts
 ```
 
-CALL-E returns the conversation speaker-tagged as `{speaker, text, ts}`, so the
-whole exchange can be shown as text — no audio capture, no recording. Add
+CALL-E returns the conversation speaker-tagged, so the whole exchange can be
+shown as text — no audio capture, no recording. The turns live at
+`recipients[].attempts[].transcript_turns[]`, each with `offset_seconds`,
+`speaker` (`bot` / `user` / `unknown`) and `text`, per the
+[Calls API reference](https://docs.heycall-e.com/api-reference/calls). Add
 `--replay-delay 0.4` to print it one line at a time, which is how the demo is
 filmed.
 

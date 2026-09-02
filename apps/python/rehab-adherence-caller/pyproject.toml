@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-live = ["calle-ai==0.2.0"]
+live = ["calle-ai==0.7.0"]
 dev = ["pytest>=8,<9"]
 
 [build-system]

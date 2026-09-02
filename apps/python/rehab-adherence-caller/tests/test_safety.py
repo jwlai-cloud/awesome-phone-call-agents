@@ -233,23 +233,72 @@ def test_a_failing_call_does_not_end_the_course(course_file: CourseFile) -> None
 # --- transcripts ----------------------------------------------------------------
 
 
-def test_transcript_turns_are_normalised_and_redacted() -> None:
+def test_transcript_read_from_the_documented_api_path() -> None:
+    """The turns live at recipients[].attempts[].transcript_turns[].
+
+    This test exists because the first implementation read a top-level
+    "transcript" key that the API never returns: every fixture passed and every
+    real call would have come back empty. Shape per
+    https://docs.heycall-e.com/api-reference/calls
+    """
     from rehab_adherence.calle import normalize_transcript
 
-    turns = normalize_transcript(
-        [
-            {"speaker": "bot", "text": "  Ring us on +1 555 010 1000  ", "ts": "00:00:00"},
-            {"speaker": "USER", "text": "ok", "ts": "00:00:04"},
-            {"speaker": "SUPERVISOR", "text": "joining", "ts": "00:00:09"},
-            {"speaker": "BOT", "text": "   "},
-            "not a dict",
-            {"speaker": "BOT"},
-        ]
-    )
+    payload = {
+        "status": "completed",
+        "recipients": [
+            {
+                "attempts": [
+                    {
+                        "transcript_turns": [
+                            {"offset_seconds": 0, "speaker": "bot",
+                             "text": "  Ring us on +1 555 010 1000  "},
+                            {"offset_seconds": 64, "speaker": "user", "text": "ok"},
+                            {"offset_seconds": 70, "speaker": "unknown", "text": "joining"},
+                            {"offset_seconds": 75, "speaker": "bot", "text": "   "},
+                            "not a dict",
+                        ]
+                    }
+                ]
+            }
+        ],
+    }
+    turns = normalize_transcript(payload)
     assert [t["speaker"] for t in turns] == ["BOT", "USER", "OTHER"]
     assert "5550101000" not in turns[0]["text"], "phone-shaped text must be redacted"
-    assert turns[0]["text"].startswith("Ring us on"), "whitespace is collapsed, not the sentence"
-    assert turns[1]["ts"] == "00:00:04"
+    assert turns[1]["ts"] == "00:01:04", "offset_seconds becomes a clock stamp"
+
+
+def test_a_top_level_transcript_key_is_not_read() -> None:
+    """Guards the exact bug: a payload with the old shape must yield nothing,
+    so a fixture in the wrong shape fails loudly instead of passing quietly."""
+    from rehab_adherence.calle import normalize_transcript
+
+    assert normalize_transcript(
+        {"transcript": [{"speaker": "BOT", "text": "hello", "ts": "00:00:00"}]}
+    ) == []
+
+
+def test_confidence_is_an_object_not_a_float() -> None:
+    from rehab_adherence.calle import confidence_score
+
+    assert confidence_score({"score": 0.92, "label": "high"}) == 0.92
+    assert confidence_score(0.75) == 0.75, "a bare number is still tolerated"
+    assert confidence_score(None) is None
+    assert confidence_score({"label": "high"}) is None
+
+
+def test_structured_result_falls_back_to_the_recipient() -> None:
+    """Both levels exist. An aggregate at task level must not shadow the
+    recipient result that actually carries our schema's fields."""
+    from rehab_adherence.calle import RESULT_KEYS, structured_result
+
+    ours = {"reached_patient": "yes", "attendance_intent": "will_attend"}
+    payload = {
+        "structured_result": {"completed_count": 1},
+        "recipients": [{"structured_result": ours}],
+    }
+    assert structured_result(payload, RESULT_KEYS) == ours
+    assert structured_result({"structured_result": ours}, RESULT_KEYS) == ours
 
 
 def test_transcript_render_shows_the_refusal(course_file: CourseFile) -> None:
