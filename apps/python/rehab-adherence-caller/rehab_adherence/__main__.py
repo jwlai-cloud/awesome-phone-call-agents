@@ -86,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print each call as speaker-tagged turns after the ledger.",
     )
+    recover = subparsers.add_parser(
+        "recover", help="Re-read a call that was already placed. Places no call."
+    )
+    recover.add_argument("--call-id", required=True, help="Call id from the checkpoint file.")
+    recover.add_argument("--base-url", default=DEFAULT_BASE_URL)
+
     runner.add_argument(
         "--replay-delay",
         type=float,
@@ -102,6 +108,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 2
+
+    if args.command == "recover":
+        api_key = os.environ.get("CALLE_API_KEY", "")
+        if not api_key:
+            raise SystemExit("set CALLE_API_KEY in the environment")
+        result = LivePort(api_key, base_url=args.base_url).fetch(args.call_id)
+        print(json.dumps(result, indent=2, default=str))
+        return 0
 
     course_file = _load(args.course)
     today = _today(args.today)
@@ -130,8 +144,11 @@ def main(argv: list[str] | None = None) -> int:
         api_key = os.environ.get("CALLE_API_KEY", "")
         if not api_key:
             raise SystemExit("set CALLE_API_KEY in the environment; never place it in a file")
-        port = LivePort(api_key, base_url=args.base_url)
+        checkpoint = (args.output.with_suffix(".callids") if args.output
+                      else Path("private/placed-calls.callids"))
+        port = LivePort(api_key, base_url=args.base_url, checkpoint=checkpoint)
         banner = LIVE_BANNER
+        print(f"call ids will be checkpointed to {checkpoint} before each poll", flush=True)
     elif args.fixture:
         try:
             responses = json.loads(args.fixture.read_text(encoding="utf-8"))
@@ -141,6 +158,9 @@ def main(argv: list[str] | None = None) -> int:
         banner = FIXTURE_BANNER
     else:
         raise SystemExit("run needs --fixture (no calls) or --live (real calls)")
+
+    if args.live:
+        print("dialling — this takes 60-120s per patient and the terminal stays quiet\n", flush=True)
 
     rows = run(course_file, today, port)
     print(render(rows, banner=banner, course_id=course_file.course.id, today=today.isoformat()))

@@ -24,7 +24,9 @@ a bare float. `evidence` is a list of short strings from the post-call summary.
 
 from __future__ import annotations
 
+import os
 import re
+from pathlib import Path
 from typing import Any, Protocol
 
 PHONE_LIKE = re.compile(r"(?:\+\d[\d\s().-]{6,}\d)|(?:\b\d[\d\s().-]{7,}\d\b)")
@@ -189,7 +191,14 @@ class FixturePort:
 class LivePort:
     """Places one real call per decision. Only reachable behind explicit flags."""
 
-    def __init__(self, api_key: str, *, base_url: str = DEFAULT_BASE_URL, timeout_seconds: int = 600) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout_seconds: int = 600,
+        checkpoint: "Path | None" = None,
+    ) -> None:
         if not api_key:
             raise ValueError("a CALL-E API key is required for live mode")
         try:
@@ -200,13 +209,38 @@ class LivePort:
             ) from exc
         self._client = CalleClient(api_key=api_key, base_url=base_url)
         self._timeout_seconds = timeout_seconds
+        self._checkpoint = checkpoint
 
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]:
         created = self._client.calls.create(**arguments)
         call_id = created.get("id")
         if not isinstance(call_id, str) or not call_id:
             raise RuntimeError("CALL-E create response contained no call id; reconcile before retrying")
+        # Checkpoint the accepted id BEFORE polling. The call is already placed
+        # and already billed at this point; if the poll is interrupted, times out,
+        # or the process dies, the id is the only way to recover the result. It
+        # used to be written to the ledger at the very end of the run, which meant
+        # an interrupted poll lost a completed call entirely.
+        self._note_checkpoint(call_id, patient_id)
+
         completed = self._client.calls.wait_for_result(
             call_id, timeout_seconds=self._timeout_seconds, interval_seconds=2
         )
         return _read_payload(completed, call_id=call_id, simulated=False)
+
+    def fetch(self, call_id: str) -> dict[str, Any]:
+        """Re-read a call that was already placed. Recovery path for an
+        interrupted poll -- costs nothing and places no call."""
+        return _read_payload(self._client.calls.get(call_id), call_id=call_id, simulated=False)
+
+    def _note_checkpoint(self, call_id: str, patient_id: str) -> None:
+        if self._checkpoint is None:
+            return
+        try:
+            self._checkpoint.parent.mkdir(parents=True, exist_ok=True)
+            with self._checkpoint.open("a", encoding="utf-8") as handle:
+                handle.write(f"{patient_id}\t{call_id}\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:  # never let bookkeeping abort a placed call
+            print(f"  WARNING: could not checkpoint {call_id}: {exc}", flush=True)

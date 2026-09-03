@@ -326,3 +326,42 @@ def test_transcript_render_handles_a_call_with_no_transcript(course_file: Course
     rows = run(course_file, TODAY, FixturePort(responses))
     wu = next(row for row in rows if row.patient_id == "p_wu")
     assert "no transcript returned" in render_transcript(wu)
+
+
+def test_call_id_is_checkpointed_before_polling(tmp_path: Path) -> None:
+    """The call is placed and billed before the poll starts. If the poll is
+    interrupted, the id must already be on disk or the result is unrecoverable.
+
+    Regression for a real incident: a live call connected, the poll did not
+    complete, and nothing was written because the ledger was only saved at the
+    end of the run. The call could not be recovered.
+    """
+    from rehab_adherence.calle import LivePort
+
+    checkpoint = tmp_path / "ids.callids"
+
+    class Interrupted(LivePort):
+        def __init__(self) -> None:  # skip the SDK import entirely
+            self._timeout_seconds = 1
+            self._checkpoint = checkpoint
+
+            class _Calls:
+                @staticmethod
+                def create(**_kwargs):
+                    return {"id": "call_abc123"}
+
+                @staticmethod
+                def wait_for_result(*_a, **_k):
+                    raise KeyboardInterrupt("operator stopped the poll")
+
+            class _Client:
+                calls = _Calls()
+
+            self._client = _Client()
+
+    with pytest.raises(KeyboardInterrupt):
+        Interrupted().place({"task": "x"}, patient_id="p_ivy")
+
+    assert checkpoint.exists(), "the id must survive an interrupted poll"
+    assert "call_abc123" in checkpoint.read_text()
+    assert "p_ivy" in checkpoint.read_text()
