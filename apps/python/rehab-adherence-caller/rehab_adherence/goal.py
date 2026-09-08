@@ -93,10 +93,21 @@ def spoken_reference(code: str) -> str:
     return " ".join(code[i : i + 2] for i in range(0, len(code), 2))
 
 
-def idempotency_key(course: Course, patient: Patient, decision: Decision) -> str:
-    """One key per (course, patient, action, attempt). Replaying the same decision
-    must not create a second call."""
-    raw = f"{course.id}:{patient.id}:{decision.action}:{decision.signals.calls_made}"
+def idempotency_key(course: Course, patient: Patient, decision: Decision, task: str) -> str:
+    """One key per distinct request.
+
+    Re-running the same plan must not place a second call, so the key must be
+    stable for an unchanged request. But it must also *change* when the request
+    changes: an earlier version keyed only on course, patient, action and attempt
+    count, so editing the patient's name and re-running was rejected outright with
+    "Idempotency key was reused with a different request" — and no call went out
+    at all. The task text is what the recipient actually hears, so it belongs in
+    the key.
+    """
+    raw = (
+        f"{course.id}:{patient.id}:{decision.action}:{decision.signals.calls_made}:"
+        f"{hashlib.sha256(task.encode()).hexdigest()[:16]}"
+    )
     return f"rehab-{hashlib.sha256(raw.encode()).hexdigest()[:16]}"
 
 

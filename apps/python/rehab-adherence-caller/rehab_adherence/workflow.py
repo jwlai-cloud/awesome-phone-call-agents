@@ -48,8 +48,9 @@ class Row:
 def build_call_arguments(course_file: CourseFile, patient_id: str, decision: Decision) -> dict[str, Any]:
     """The exact payload CALL-E would receive. Rendered in preview, unchanged."""
     patient = next(p for p in course_file.patients if p.id == patient_id)
+    task = build_task(course_file.clinic, course_file.course, patient, decision)
     return {
-        "task": build_task(course_file.clinic, course_file.course, patient, decision),
+        "task": task,
         "recipients": [{"phones": [patient.phone_e164], "locale": "en"}],
         "result_schema": build_result_schema(course_file.course),
         "metadata": {
@@ -58,7 +59,7 @@ def build_call_arguments(course_file: CourseFile, patient_id: str, decision: Dec
             "trajectory": decision.trajectory,
             "action": decision.action,
         },
-        "idempotency_key": idempotency_key(course_file.course, patient, decision),
+        "idempotency_key": idempotency_key(course_file.course, patient, decision, task),
     }
 
 

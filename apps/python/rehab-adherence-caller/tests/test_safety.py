@@ -480,3 +480,33 @@ def test_terminal_status_is_reread_when_the_result_is_not_yet_finalised() -> Non
     result = port.place({"task": "x"}, patient_id="p_ivy")
     assert port.get_calls == 1, "must re-read once when the result is still null"
     assert result["structured_result"]["attendance_intent"] == "will_attend"
+
+
+def test_idempotency_key_changes_when_the_request_changes(raw: dict) -> None:
+    """Regression from a real run. The key was derived only from course, patient,
+    action and attempt count. Editing the patient's name changed what the
+    recipient would hear but not the key, so CALL-E rejected the request with
+    "Idempotency key was reused with a different request" and no call was placed.
+
+    Replaying an unchanged request must still dedupe.
+    """
+    from rehab_adherence.decide import decide
+    from rehab_adherence.goal import build_task, idempotency_key
+
+    def key_for(document: dict) -> str:
+        course_file = CourseFile.parse(document)
+        patient = course_file.patients[0]
+        decision = decide(patient, course_file.course, course_file.policy, TODAY)
+        task = build_task(course_file.clinic, course_file.course, patient, decision)
+        return idempotency_key(course_file.course, patient, decision, task)
+
+    baseline = key_for(raw)
+    assert key_for(json.loads(json.dumps(raw))) == baseline, "an unchanged request must dedupe"
+
+    renamed = json.loads(json.dumps(raw))
+    renamed["patients"][0]["first_name"] = "Someone Else"
+    assert key_for(renamed) != baseline, "a different spoken name is a different request"
+
+    reslotted = json.loads(json.dumps(raw))
+    reslotted["course"]["offered_slots"][0]["label"] = "Friday 21 August, 4:00pm"
+    assert key_for(reslotted) != baseline, "different offered times are a different request"
