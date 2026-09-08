@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -198,6 +199,7 @@ class LivePort:
         base_url: str = DEFAULT_BASE_URL,
         timeout_seconds: int = 600,
         checkpoint: "Path | None" = None,
+        settle_seconds: float = 4.0,
     ) -> None:
         if not api_key:
             raise ValueError("a CALL-E API key is required for live mode")
@@ -210,6 +212,7 @@ class LivePort:
         self._client = CalleClient(api_key=api_key, base_url=base_url)
         self._timeout_seconds = timeout_seconds
         self._checkpoint = checkpoint
+        self._settle_seconds = settle_seconds
 
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]:
         created = self._client.calls.create(**arguments)
@@ -226,6 +229,21 @@ class LivePort:
         completed = self._client.calls.wait_for_result(
             call_id, timeout_seconds=self._timeout_seconds, interval_seconds=2
         )
+
+        # A terminal status is not the same as a finalised result. On a real call
+        # wait_for_result returned status "completed" while structured_result and
+        # completion_confidence were still null; a second read a moment later had
+        # both. Re-reading once costs nothing and no call, and without it a
+        # completed booking is recorded as no_answer.
+        if structured_result(completed, RESULT_KEYS) is None:
+            time.sleep(self._settle_seconds)
+            try:
+                refetched = self._client.calls.get(call_id)
+            except Exception:  # noqa: BLE001 - keep the result we already have
+                refetched = None
+            if refetched and structured_result(refetched, RESULT_KEYS) is not None:
+                completed = refetched
+
         return _read_payload(completed, call_id=call_id, simulated=False)
 
     def fetch(self, call_id: str) -> dict[str, Any]:

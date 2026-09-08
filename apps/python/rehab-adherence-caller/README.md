@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 50 tests, no credentials, no network
+python3 -m pytest -q                       # 55 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -179,6 +179,18 @@ Results are read conservatively:
 
 - **Silence is never agreement.** A completed call with no usable structured
   result becomes `undecided`, never a booking.
+- **A slot taken by someone whose identity was never confirmed is not a booking.**
+  On the first real call the caller asked for the patient, never got a clear
+  confirmation, and still took an appointment; CALL-E reported
+  `reached_patient: "unknown"` alongside a chosen slot. Recording that as booked
+  puts an unverified person's word in the record, and discarding it loses a real
+  slot — so it becomes `identity_unconfirmed` and goes to a human.
+- **`unknown` is not `no`.** Only an explicit `"no"` means the patient was not
+  reached.
+- **A terminal status is not a finalised result.** `wait_for_result` can return
+  `completed` while the post-call summary is still null. The client re-reads once
+  before recording an outcome; without that, a completed booking was written down
+  as `no_answer`.
 - "Will attend" without an identifiable slot is `undecided`, not a booking.
 - Voicemail is a voicemail, not a refusal.
 - Declining after the AI disclosure ends automated contact for the course.

@@ -26,7 +26,7 @@ from .model import Clinic, Course, Patient
 # What the caller may say. Anything not derivable from these is not sayable.
 _DISCLOSURE = (
     "Open by saying you are an automated assistant calling on behalf of {clinic}. "
-    "Say the reference {reference}. "
+    "Say the reference as three two-digit numbers: {reference}. "
     "If the person doubts the call is genuine, do not try to persuade them: tell them to hang up "
     "and ring {callback} themselves, which is the clinic's own published number, and quote that reference. "
     "Never read out a phone number the person did not already give you."
@@ -69,10 +69,28 @@ _BOUNDARY = (
 )
 
 
+# Digits only, and no 0/1 to avoid oh/one confusion when spoken aloud.
+_REFERENCE_ALPHABET = "23456789"
+
+
 def reference(clinic: Clinic, course: Course, patient: Patient) -> str:
-    """Stable, non-identifying reference the patient can quote back to the clinic."""
-    digest = hashlib.sha256(f"{course.id}:{patient.id}".encode()).hexdigest()[:6].upper()
-    return f"{clinic.reference_prefix}-{digest}"
+    """A reference a person can actually write down while on the phone.
+
+    This was `RCR-708A4D`. On a real call the caller read it out as "capitalized
+    R, capitalized C, capitalized R, dash, seven, zero, eight, capitalized A,
+    four, capitalized D" — fifteen seconds of noise that nobody could act on.
+
+    Six digits, spoken as three pairs, no letters and no 0 or 1. The prefix is
+    kept for the clinic's own records but is not spoken.
+    """
+    digest = hashlib.sha256(f"{course.id}:{patient.id}".encode()).digest()
+    return "".join(_REFERENCE_ALPHABET[b % len(_REFERENCE_ALPHABET)] for b in digest[:6])
+
+
+def spoken_reference(code: str) -> str:
+    """Group into pairs so the caller says "forty-two, sixty-three, ninety-five"
+    rather than spelling six separate digits."""
+    return " ".join(code[i : i + 2] for i in range(0, len(code), 2))
 
 
 def idempotency_key(course: Course, patient: Patient, decision: Decision) -> str:
@@ -90,7 +108,7 @@ def build_task(clinic: Clinic, course: Course, patient: Patient, decision: Decis
     parts = [
         _DISCLOSURE.format(
             clinic=clinic.name,
-            reference=reference(clinic, course, patient),
+            reference=spoken_reference(reference(clinic, course, patient)),
             callback=clinic.public_callback_number,
         ),
         ask.format(name=patient.first_name, slots=slots),

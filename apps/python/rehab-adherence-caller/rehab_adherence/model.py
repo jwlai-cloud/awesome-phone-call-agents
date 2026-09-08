@@ -28,6 +28,7 @@ CONTACT_OUTCOMES = {
     "stopped_feels_better",
     "refused_contact",
     "symptom_reported",
+    "identity_unconfirmed",
     "undecided",
 }
 

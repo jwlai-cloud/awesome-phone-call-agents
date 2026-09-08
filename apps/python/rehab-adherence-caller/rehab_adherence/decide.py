@@ -266,7 +266,8 @@ def interpret(status: str, structured: dict | None, course: Course) -> Interpret
             "patient raised a symptom or health concern; not triaged, not rebooked, escalated to a clinician",
         )
 
-    if structured.get("reached_patient") != "yes":
+    reached = structured.get("reached_patient")
+    if reached == "no":
         return Interpretation("no_answer", None, False, "the intended patient was not reached")
 
     if structured.get("continued_after_ai_disclosure") == "no":
@@ -287,6 +288,18 @@ def interpret(status: str, structured: dict | None, course: Course) -> Interpret
         if slot is None:
             return Interpretation(
                 "undecided", None, False, "patient said they would attend but accepted no identifiable slot"
+            )
+        if reached != "yes":
+            # Someone took the appointment, but the caller never confirmed it was
+            # the patient. Recording it as a booking would put an unverified
+            # person's word into the record; discarding it would lose a real
+            # slot. Neither is safe on its own, so a human checks.
+            return Interpretation(
+                "identity_unconfirmed",
+                None,
+                True,
+                f"a slot was accepted ({slot.label}) but the caller never confirmed "
+                "it was speaking to the patient; a clinician should verify before this is treated as booked",
             )
         return Interpretation("promised_return", slot.date, False, f"booked {slot.label}")
     if intent == "cannot_attend":

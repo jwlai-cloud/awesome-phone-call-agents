@@ -41,7 +41,9 @@ def render(rows: list[Row], *, banner: str, course_id: str, today: str) -> str:
                 lines.append(f"     booked: {row.promised_date}")
             if row.note:
                 lines.append(f"     note: {row.note}")
-            if row.escalate_to_clinician:
+            if row.outcome == "identity_unconfirmed":
+                lines.append("     >>> SLOT TAKEN BUT IDENTITY UNCONFIRMED -- a clinician must verify")
+            elif row.escalate_to_clinician:
                 lines.append("     >>> ESCALATED TO CLINICIAN -- not rebooked by this application")
         elif row.outcome == "call_failed":
             lines.append(f"     call failed: {row.note}")

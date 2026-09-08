@@ -106,7 +106,9 @@ def test_disclosure_offers_an_out_of_band_check(course_file: CourseFile) -> None
     assert "automated assistant" in task
     assert "hang up" in task
     assert course_file.clinic.public_callback_number in task
-    assert reference(course_file.clinic, course_file.course, patient) in task
+    from rehab_adherence.goal import spoken_reference
+    code = reference(course_file.clinic, course_file.course, patient)
+    assert spoken_reference(code) in task, "the spoken form is what the caller says"
 
 
 def test_reference_is_stable_and_carries_no_identity(course_file: CourseFile) -> None:
@@ -365,3 +367,116 @@ def test_call_id_is_checkpointed_before_polling(tmp_path: Path) -> None:
     assert checkpoint.exists(), "the id must survive an interrupted poll"
     assert "call_abc123" in checkpoint.read_text()
     assert "p_ivy" in checkpoint.read_text()
+
+
+def test_reference_is_speakable_over_a_phone() -> None:
+    """Regression from a real call. The reference was RCR-708A4D and the caller
+    read it out as "capitalized R, capitalized C, capitalized R, dash, seven,
+    zero, eight, capitalized A, four, capitalized D" — fifteen seconds nobody
+    could write down."""
+    from rehab_adherence.goal import reference, spoken_reference
+    from rehab_adherence.model import CourseFile
+
+    course_file = CourseFile.parse(json.loads(EXAMPLE.read_text(encoding="utf-8")))
+    for patient in course_file.patients:
+        code = reference(course_file.clinic, course_file.course, patient)
+        assert code.isdigit(), "letters get spelled out with case names"
+        assert len(code) == 6
+        assert "0" not in code and "1" not in code, "oh/one confusion when spoken"
+        assert spoken_reference(code) == f"{code[:2]} {code[2:4]} {code[4:]}"
+
+
+def test_a_slot_taken_by_an_unconfirmed_person_is_not_a_booking(course_file: CourseFile) -> None:
+    """Regression from a real call. The caller asked for the patient, never got a
+    clear confirmation, and still took a booking. CALL-E reported
+    reached_patient="unknown" alongside a chosen slot.
+
+    Recording that as booked puts an unverified person's word in the record.
+    Discarding it loses a real slot. It goes to a human instead.
+    """
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "unknown",
+            "continued_after_ai_disclosure": "yes",
+            "attendance_intent": "will_attend",
+            "chosen_slot_id": "s2",
+            "barrier": "none",
+            "symptom_volunteered": "no",
+            "evidence_summary": "The person said OK and chose Tuesday.",
+        },
+        course_file.course,
+    )
+    assert reading.outcome == "identity_unconfirmed"
+    assert reading.escalate_to_clinician is True
+    assert reading.promised_date is None, "an unverified booking must not become a date"
+
+
+def test_unknown_identity_alone_is_not_a_no_answer(course_file: CourseFile) -> None:
+    """Only an explicit "no" means the patient was not reached. "unknown" with a
+    real conversation behind it must not be collapsed into no_answer, which is
+    what discarded a completed booking on the first live call."""
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "unknown",
+            "continued_after_ai_disclosure": "yes",
+            "attendance_intent": "cannot_attend",
+            "chosen_slot_id": "none",
+            "barrier": "transport",
+            "symptom_volunteered": "no",
+            "evidence_summary": "No transport.",
+        },
+        course_file.course,
+    )
+    assert reading.outcome == "cannot_attend", "unknown is not no"
+
+
+def test_terminal_status_is_reread_when_the_result_is_not_yet_finalised() -> None:
+    """Regression from a real call: wait_for_result returned status "completed"
+    with structured_result still null, while a read moments later had the full
+    post-call summary. Reporting the first read recorded a booking as no_answer.
+    """
+    from rehab_adherence.calle import LivePort
+
+    finalised = {
+        "status": "completed",
+        "structured_result": {"reached_patient": "yes", "attendance_intent": "will_attend"},
+        "recipients": [],
+    }
+
+    class Racing(LivePort):
+        def __init__(self) -> None:
+            self._timeout_seconds = 1
+            self._checkpoint = None
+            self._settle_seconds = 0.0
+            self.get_calls = 0
+            outer = self
+
+            class _Calls:
+                @staticmethod
+                def create(**_k):
+                    return {"id": "call_x"}
+
+                @staticmethod
+                def wait_for_result(*_a, **_k):
+                    return {"status": "completed", "structured_result": None, "recipients": []}
+
+                @staticmethod
+                def get(_call_id):
+                    outer.get_calls += 1
+                    return finalised
+
+            class _Client:
+                calls = _Calls()
+
+            self._client = _Client()
+
+    port = Racing()
+    result = port.place({"task": "x"}, patient_id="p_ivy")
+    assert port.get_calls == 1, "must re-read once when the result is still null"
+    assert result["structured_result"]["attendance_intent"] == "will_attend"
