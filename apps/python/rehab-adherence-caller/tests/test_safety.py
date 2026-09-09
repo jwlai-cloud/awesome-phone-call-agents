@@ -346,6 +346,7 @@ def test_call_id_is_checkpointed_before_polling(tmp_path: Path) -> None:
         def __init__(self) -> None:  # skip the SDK import entirely
             self._timeout_seconds = 1
             self._checkpoint = checkpoint
+            self._replay_after_seconds = 120.0
 
             class _Calls:
                 @staticmethod
@@ -454,6 +455,7 @@ def test_terminal_status_is_reread_when_the_result_is_not_yet_finalised() -> Non
             self._timeout_seconds = 1
             self._checkpoint = None
             self._settle_seconds = 0.0
+            self._replay_after_seconds = 120.0
             self.get_calls = 0
             outer = self
 
@@ -723,3 +725,57 @@ def test_the_ledger_keeps_the_note_the_call_produced(course_file: CourseFile, tm
     assert "taxi voucher" in written
     for patient in course_file.patients:
         assert patient.phone_e164 not in written, "notes must not reintroduce a number"
+
+
+def test_a_replayed_call_is_reported_as_such(tmp_path: Path) -> None:
+    """Regression from a real run. Re-running an unchanged plan produced the same
+    idempotency key, so CALL-E returned a call placed twenty minutes earlier —
+    and the run printed it as a fresh, successful call. Nobody's phone rang.
+
+    Believing a patient was called when they were not is not a cosmetic fault.
+    """
+    from rehab_adherence.calle import LivePort
+
+    class Replaying(LivePort):
+        def __init__(self, created_at: str) -> None:
+            self._timeout_seconds = 1
+            self._checkpoint = None
+            self._settle_seconds = 0.0
+            self._replay_after_seconds = 120.0
+
+            class _Calls:
+                @staticmethod
+                def create(**_k):
+                    return {"id": "call_old", "created_at": created_at}
+
+                @staticmethod
+                def wait_for_result(*_a, **_k):
+                    return {
+                        "status": "completed",
+                        "structured_result": {"reached_patient": "yes"},
+                        "recipients": [],
+                    }
+
+            class _Client:
+                calls = _Calls()
+
+            self._client = _Client()
+
+    stale = Replaying("2020-01-01T00:00:00Z").place({"task": "x"}, patient_id="p")
+    assert stale["replayed"] is True
+    assert stale["replayed_from"] == "2020-01-01T00:00:00Z"
+
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    assert Replaying(now).place({"task": "x"}, patient_id="p")["replayed"] is False
+
+
+def test_a_missing_created_at_never_fabricates_a_replay_warning() -> None:
+    """Unknown age reads as zero. A provider that stops returning created_at must
+    not turn every call into a false warning."""
+    from rehab_adherence.calle import _age_seconds
+
+    assert _age_seconds(None) == 0.0
+    assert _age_seconds("not a timestamp") == 0.0
+    assert _age_seconds("2020-01-01T00:00:00Z") > 1_000_000

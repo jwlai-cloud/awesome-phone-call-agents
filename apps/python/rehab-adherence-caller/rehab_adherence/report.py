@@ -43,6 +43,16 @@ def render(rows: list[Row], *, banner: str, course_id: str, today: str) -> str:
         if row.blockers:
             lines.append(f"     BLOCKED: {', '.join(row.blockers)} -- no call placed")
         if row.called:
+            if row.replayed:
+                lines.append(
+                    "     *** NO CALL PLACED — this is a replay of an earlier call with the"
+                )
+                lines.append(
+                    "         same idempotency key. Log the previous attempt in contact_log,"
+                )
+                lines.append(
+                    "         or change the plan, to place a genuinely new call. ***"
+                )
             lines.append(f"     result: status={row.status} outcome={row.outcome}")
             if row.promised_date:
                 lines.append(f"     booked: {row.promised_date}")

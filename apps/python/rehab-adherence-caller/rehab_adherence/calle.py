@@ -54,6 +54,20 @@ class CallPort(Protocol):
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]: ...
 
 
+def _age_seconds(created_at: Any) -> float:
+    """How long ago the provider says this call was created. Unknown reads as 0,
+    so a missing timestamp never fabricates a replay warning."""
+    if not isinstance(created_at, str):
+        return 0.0
+    from datetime import datetime, timezone
+
+    try:
+        stamp = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    return (datetime.now(timezone.utc) - stamp).total_seconds()
+
+
 def normalize_transcript(payload: Any) -> list[dict[str, str]]:
     """Pull the conversation out of a terminal call payload.
 
@@ -200,6 +214,7 @@ class LivePort:
         timeout_seconds: int = 600,
         checkpoint: "Path | None" = None,
         settle_seconds: float = 4.0,
+        replay_after_seconds: float = 120.0,
     ) -> None:
         if not api_key:
             raise ValueError("a CALL-E API key is required for live mode")
@@ -213,12 +228,21 @@ class LivePort:
         self._timeout_seconds = timeout_seconds
         self._checkpoint = checkpoint
         self._settle_seconds = settle_seconds
+        self._replay_after_seconds = replay_after_seconds
 
     def place(self, arguments: dict[str, Any], *, patient_id: str) -> dict[str, Any]:
         created = self._client.calls.create(**arguments)
         call_id = created.get("id")
         if not isinstance(call_id, str) or not call_id:
             raise RuntimeError("CALL-E create response contained no call id; reconcile before retrying")
+
+        # An idempotency key that matches an earlier request returns that earlier
+        # call rather than placing a new one. That is correct, and it is also how
+        # a run can report a completed call that never happened: the same course,
+        # patient, action, attempt count and task text produce the same key, so
+        # re-running an unchanged plan replays a result that may be hours old.
+        # Believing you rang a patient when you did not is not a cosmetic fault.
+        replayed = _age_seconds(created.get("created_at")) > self._replay_after_seconds
         # Checkpoint the accepted id BEFORE polling. The call is already placed
         # and already billed at this point; if the poll is interrupted, times out,
         # or the process dies, the id is the only way to recover the result. It
@@ -244,7 +268,11 @@ class LivePort:
             if refetched and structured_result(refetched, RESULT_KEYS) is not None:
                 completed = refetched
 
-        return _read_payload(completed, call_id=call_id, simulated=False)
+        payload = _read_payload(completed, call_id=call_id, simulated=False)
+        payload["replayed"] = replayed
+        if replayed:
+            payload["replayed_from"] = created.get("created_at")
+        return payload
 
     def fetch(self, call_id: str) -> dict[str, Any]:
         """Re-read a call that was already placed. Recovery path for an

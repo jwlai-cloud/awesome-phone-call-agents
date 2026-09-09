@@ -42,6 +42,7 @@ class Row:
     evidence_summary: str | None = None
     confidence: float | None = None
     recommendation: str | None = None
+    replayed: bool = False
     signals: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -161,6 +162,7 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
                     "note": reading.note,
                     "call_id": result.get("call_id"),
                     "simulated": result.get("simulated"),
+                    "replayed": bool(result.get("replayed")),
                     "transcript": result.get("transcript") or [],
                 }
             )
