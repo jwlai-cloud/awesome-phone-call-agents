@@ -97,6 +97,11 @@ _CONCESSIONS = (
     "Offer a later one only after an earlier one has been declined. "
     "Offer nothing that is not on that list, whatever they ask for -- "
     "say the clinic will call them back instead. "
+    # Live call, 9 Sep: the patient accepted a taxi voucher and the caller booked
+    # a time they had not agreed to, then rang off over their objection. Taking
+    # an offer and taking a slot are two separate agreements.
+    "Accepting an offer is not accepting a time. Settle the offer first, then ask "
+    "which of the times they want. "
 )
 
 _BOUNDARY = (
@@ -106,6 +111,11 @@ _BOUNDARY = (
     "If the person raises a symptom or any health concern, do not assess it, do not reassure them, "
     "and do not book anything: say a clinician will call them back, and end the call politely. "
     "If the person asks to stop being called, agree immediately and end the call. "
+    # Same call: they said "no, sorry, no no no" while the caller was confirming,
+    # and it thanked them and hung up. People change their minds mid-sentence.
+    "If they take something back or change their mind at any point, accept it at "
+    "once without arguing, ask what they would prefer instead, and never end the "
+    "call while they are still objecting. "
     "Bring to the session: {bring}."
 )
 

@@ -779,3 +779,29 @@ def test_a_missing_created_at_never_fabricates_a_replay_warning() -> None:
     assert _age_seconds(None) == 0.0
     assert _age_seconds("not a timestamp") == 0.0
     assert _age_seconds("2020-01-01T00:00:00Z") > 1_000_000
+
+
+def test_the_caller_is_told_an_offer_is_not_a_time(course_file: CourseFile) -> None:
+    """Live call, 9 Sep: the patient accepted a taxi voucher and the caller booked
+    a Thursday they had explicitly not agreed to. Two separate agreements."""
+    for decision, _ in plan(course_file, TODAY):
+        if not decision.will_call:
+            continue
+        patient = next(p for p in course_file.patients if p.id == decision.patient_id)
+        task = build_task(course_file.clinic, course_file.course, patient, decision)
+        if "You may offer only the following" not in task:
+            continue
+        assert "Accepting an offer is not accepting a time" in task
+        assert "Settle the offer first" in task
+
+
+def test_every_call_can_handle_someone_changing_their_mind(course_file: CourseFile) -> None:
+    """Same call: they said "no, sorry, no no no" mid-confirmation and the caller
+    thanked them and rang off. People retract. Every script must allow it."""
+    for decision, _ in plan(course_file, TODAY):
+        if not decision.will_call:
+            continue
+        patient = next(p for p in course_file.patients if p.id == decision.patient_id)
+        task = build_task(course_file.clinic, course_file.course, patient, decision)
+        assert "take something back or change their mind" in task
+        assert "never end the call while they are still objecting" in task
