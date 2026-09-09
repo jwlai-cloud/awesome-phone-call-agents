@@ -32,6 +32,11 @@ _DISCLOSURE = (
     "Never read out a phone number the person did not already give you."
 )
 
+# Calls that may negotiate. A discharge-confirm call must not bargain with
+# someone who has said they are finished, and a final re-engagement call is one
+# clean offer by design.
+_NEGOTIATING_ACTIONS = {"call_blocker_and_rebook", "call_final_reengagement"}
+
 _ASK_BY_ACTION = {
     "call_light_rebook": (
         "Say {name} missed one session and the clinic kept their place. "
@@ -72,6 +77,18 @@ _VOICEMAIL = (
     "specialty, appointments, missed sessions, or health of any kind. "
     "Say only: this is a message for {name} from {clinic}, please call {callback}. "
     "Then end the call. "
+)
+
+# The negotiation. The caller may spend only what the clinic granted, in the
+# order the clinic set, and only once the barrier is known. Offering a remedy
+# nobody authorised is the failure this wording exists to prevent.
+_CONCESSIONS = (
+    "If they cannot take either time, do not give up and do not invent an offer. "
+    "You may offer only the following, strictly in this order, and only one at a "
+    "time, stopping as soon as they accept: {ladder}. "
+    "Offer a later one only after an earlier one has been declined. "
+    "Offer nothing that is not on that list, whatever they ask for -- "
+    "say the clinic will call them back instead. "
 )
 
 _BOUNDARY = (
@@ -127,6 +144,13 @@ def idempotency_key(course: Course, patient: Patient, decision: Decision, task: 
     return f"rehab-{hashlib.sha256(raw.encode()).hexdigest()[:16]}"
 
 
+def concession_ladder(course: Course) -> str:
+    """Render the authorised offers in tier order, as the caller will hear them."""
+    return "; ".join(
+        f"({index}) {c.offer}" for index, c in enumerate(course.concessions, start=1)
+    )
+
+
 def build_task(clinic: Clinic, course: Course, patient: Patient, decision: Decision) -> str:
     ask = _ASK_BY_ACTION.get(decision.action)
     if ask is None:
@@ -139,6 +163,11 @@ def build_task(clinic: Clinic, course: Course, patient: Patient, decision: Decis
             callback=clinic.public_callback_number,
         ),
         ask.format(name=patient.first_name, slots=slots),
+        *(
+            [_CONCESSIONS.format(ladder=concession_ladder(course))]
+            if course.concessions and decision.action in _NEGOTIATING_ACTIONS
+            else []
+        ),
         _VOICEMAIL.format(
             name=patient.first_name,
             clinic=clinic.name,
@@ -160,6 +189,8 @@ def build_result_schema(course: Course) -> dict[str, Any]:
             "attendance_intent",
             "chosen_slot_id",
             "barrier",
+            "concession_offered",
+            "concession_accepted",
             "symptom_volunteered",
             "evidence_summary",
         ],
@@ -188,6 +219,16 @@ def build_result_schema(course: Course) -> dict[str, Any]:
                 "type": "string",
                 "enum": ["transport", "cost", "work_or_childcare", "feels_better", "health_concern", "other", "none", "unknown"],
                 "description": "The single main reason attendance is difficult, in the person's own framing. Use health_concern only when they raised it themselves.",
+            },
+            "concession_offered": {
+                "type": "string",
+                "enum": [*[c.id for c in course.concessions], "none"],
+                "description": "The id of the authorised offer you actually made, or none if you made no offer. Never report an offer you did not make.",
+            },
+            "concession_accepted": {
+                "type": "string",
+                "enum": ["yes", "no", "not_offered"],
+                "description": "Whether the person accepted the offer you made.",
             },
             "symptom_volunteered": {
                 "type": "string",

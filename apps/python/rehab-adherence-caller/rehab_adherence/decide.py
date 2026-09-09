@@ -239,6 +239,7 @@ class Interpretation:
     promised_date: date | None
     escalate_to_clinician: bool
     note: str
+    concession_spent: str | None = None
 
 
 def _looks_like_voicemail(structured: dict | None, evidence: list | None) -> bool:
@@ -250,6 +251,23 @@ def _looks_like_voicemail(structured: dict | None, evidence: list | None) -> boo
         + [str((structured or {}).get("evidence_summary", ""))]
     ).lower()
     return "voicemail" in haystack or "answering machine" in haystack
+
+
+def _concession_spent(structured: dict | None, course: Course) -> str | None:
+    """Which authorised offer was actually made.
+
+    A concession the clinic never granted is discarded rather than recorded: the
+    ledger is the clinic's account of what it spent, and an unauthorised entry
+    would corrupt it. The transcript still holds whatever was really said.
+    """
+    if not isinstance(structured, dict):
+        return None
+    offered = structured.get("concession_offered")
+    if not offered or offered == "none":
+        return None
+    if not any(c.id == offered for c in course.concessions):
+        return None
+    return offered
 
 
 def interpret(
@@ -316,8 +334,74 @@ def interpret(
                 f"a slot was accepted ({slot.label}) but the caller never confirmed "
                 "it was speaking to the patient; a clinician should verify before this is treated as booked",
             )
-        return Interpretation("promised_return", slot.date, False, f"booked {slot.label}")
+        spent = _concession_spent(structured, course)
+        detail = f"booked {slot.label}"
+        if spent:
+            offer = next(c for c in course.concessions if c.id == spent)
+            detail += f" after offering tier {offer.tier}: {offer.offer}"
+        return Interpretation("promised_return", slot.date, False, detail, spent)
     if intent == "cannot_attend":
+        spent = _concession_spent(structured, course)
+        if spent:
+            offer = next(c for c in course.concessions if c.id == spent)
+            return Interpretation(
+                "cannot_attend",
+                None,
+                False,
+                f"declined even after tier {offer.tier} was offered: {offer.offer}",
+                spent,
+            )
         return Interpretation("cannot_attend", None, False, "patient cannot attend the offered times")
 
     return Interpretation("undecided", None, False, "no clear intent was established")
+
+
+
+# --- what a clinician should do next -------------------------------------------
+#
+# Deterministic, and deliberately narrow. It recommends an action a receptionist
+# or clinician can take, never a clinical one. "Arrange transport" is logistics.
+# "Review their symptoms" is not, and does not appear here.
+
+_NO_ACTION = "no action needed"
+
+
+def recommend(
+    trajectory: str, outcome: str | None, barrier: str | None, concession_spent: str | None
+) -> str:
+    """One next step, in the clinic's language.
+
+    The ledger already says what happened. A clinician reading twenty rows should
+    not have to re-derive what to do about each one.
+    """
+    if outcome == "symptom_reported":
+        return "clinician to call back today about a volunteered health concern; do not rebook until reviewed"
+    if outcome == "identity_unconfirmed":
+        return "verify with the patient directly before treating the slot as booked"
+    if trajectory == "broken_promise":
+        return "clinician to call personally; an identical automated call has already failed once"
+    if outcome == "refused_contact":
+        return "record the refusal and stop contacting for this course"
+    if outcome == "stopped_feels_better":
+        return "clinician to confirm and record an intentional discharge"
+    if outcome == "voicemail":
+        return "no message content was left; try a different time of day before escalating"
+
+    if outcome == "cannot_attend":
+        if barrier == "transport":
+            return "transport is the blocker and the ladder did not solve it; consider a home or phone review"
+        if barrier == "cost":
+            return "cost is the blocker; check eligibility for fee relief"
+        if barrier == "work_or_childcare":
+            return "hours are the blocker; consider an out-of-hours group"
+        if concession_spent:
+            return "every authorised offer was declined; a clinician should decide whether to continue the course"
+        return "no offer was made and none was accepted; review what the clinic can authorise"
+
+    if outcome == "promised_return":
+        if concession_spent:
+            return f"booked, but it cost the {concession_spent} offer; note it against the course budget"
+        return _NO_ACTION
+    if outcome in {"undecided", "no_answer"}:
+        return "nothing was established; the next attempt is the last before the cap"
+    return _NO_ACTION

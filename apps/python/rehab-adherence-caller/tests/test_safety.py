@@ -577,3 +577,131 @@ def test_a_genuine_no_answer_is_still_a_no_answer(course_file: CourseFile) -> No
         evidence=["The call was answered briefly and ended."],
     )
     assert reading.outcome == "no_answer"
+
+
+# --- the concession ladder ------------------------------------------------------
+
+
+def test_only_authorised_offers_reach_the_caller(raw: dict) -> None:
+    """The ladder is a whitelist. The caller is told exactly what it may offer,
+    and a remedy the clinic never granted must not appear in the goal text."""
+    course_file = CourseFile.parse(raw)
+    for decision, _ in plan(course_file, TODAY):
+        if not decision.will_call:
+            continue
+        patient = next(p for p in course_file.patients if p.id == decision.patient_id)
+        task = build_task(course_file.clinic, course_file.course, patient, decision)
+        if "You may offer only the following" not in task:
+            continue
+        for concession in course_file.course.concessions:
+            assert concession.offer in task
+        assert "do not invent an offer" in task
+        assert "Offer nothing that is not on that list" in task
+
+
+def test_an_unauthorised_concession_is_not_recorded(course_file: CourseFile) -> None:
+    """If the caller reports spending something the clinic never granted, the
+    ledger must not accept it. The ledger is the clinic's account of what it
+    spent; an invented entry would corrupt it."""
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "yes",
+            "continued_after_ai_disclosure": "yes",
+            "attendance_intent": "will_attend",
+            "chosen_slot_id": "s1",
+            "barrier": "cost",
+            "concession_offered": "free_parking_for_a_year",
+            "concession_accepted": "yes",
+            "symptom_volunteered": "no",
+            "evidence_summary": "Offered free parking.",
+        },
+        course_file.course,
+    )
+    assert reading.outcome == "promised_return"
+    assert reading.concession_spent is None, "an ungranted offer must not enter the record"
+
+
+def test_the_tier_actually_spent_is_recorded(course_file: CourseFile) -> None:
+    """The clinic needs to know what keeping this patient cost, not just that it
+    worked."""
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "yes",
+            "continued_after_ai_disclosure": "yes",
+            "attendance_intent": "will_attend",
+            "chosen_slot_id": "s2",
+            "barrier": "transport",
+            "concession_offered": "taxi_voucher",
+            "concession_accepted": "yes",
+            "symptom_volunteered": "no",
+            "evidence_summary": "Took the voucher.",
+        },
+        course_file.course,
+    )
+    assert reading.concession_spent == "taxi_voucher"
+    assert "tier 2" in reading.note
+
+
+def test_a_discharge_call_never_negotiates(course_file: CourseFile) -> None:
+    """Someone who has said they are finished must not be bargained with. Only
+    the two rebooking actions carry the ladder."""
+    from rehab_adherence.decide import decide
+
+    kai = next(p for p in course_file.patients if p.id == "p_kai")
+    decision = decide(kai, course_file.course, course_file.policy, TODAY)
+    assert decision.action == "call_confirm_discharge"
+    task = build_task(course_file.clinic, course_file.course, kai, decision)
+    assert "You may offer only the following" not in task
+    for concession in course_file.course.concessions:
+        assert concession.offer not in task
+
+
+def test_a_concession_referencing_an_unknown_barrier_is_rejected(raw: dict) -> None:
+    """Nothing is guessed. A `when` the schema cannot express is a configuration
+    error, not something to silently ignore."""
+    broken = json.loads(json.dumps(raw))
+    broken["course"]["concessions"] = [
+        {"id": "x", "tier": 1, "offer": "something", "when": ["whenever_they_like"]}
+    ]
+    with pytest.raises(InputError):
+        CourseFile.parse(broken)
+
+
+# --- the recommendation ---------------------------------------------------------
+
+
+def test_recommendations_are_logistics_never_clinical() -> None:
+    """A next step a receptionist can act on. "Arrange transport" is logistics;
+    "review their symptoms" is assessment and must not appear."""
+    from rehab_adherence.decide import recommend
+
+    outcomes = [
+        "promised_return", "cannot_attend", "voicemail", "no_answer", "undecided",
+        "symptom_reported", "refused_contact", "stopped_feels_better",
+        "identity_unconfirmed",
+    ]
+    forbidden = ("diagnos", "symptoms are", "treatment", "medication", "dosage", "prognos")
+    seen = set()
+    for trajectory in ("first_slip", "early_slip", "disengaging", "broken_promise", "lapsed"):
+        for outcome in outcomes:
+            for barrier in (None, "transport", "cost", "work_or_childcare"):
+                text = recommend(trajectory, outcome, barrier, None)
+                seen.add(text)
+                assert text and isinstance(text, str)
+                for word in forbidden:
+                    assert word not in text.lower(), f"clinical language in: {text}"
+    assert len(seen) > 5, "the recommendation must actually vary with the situation"
+
+
+def test_a_volunteered_symptom_recommends_a_clinician_and_no_rebooking() -> None:
+    from rehab_adherence.decide import recommend
+
+    text = recommend("disengaging", "symptom_reported", "health_concern", None)
+    assert "clinician" in text
+    assert "do not rebook" in text

@@ -32,7 +32,9 @@
           "chosen_slot_id": "s1",
           "barrier": "work_or_childcare",
           "symptom_volunteered": "no",
-          "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works."
+          "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
         },
         "attempts": [
           {
@@ -78,7 +80,9 @@
       "chosen_slot_id": "s1",
       "barrier": "work_or_childcare",
       "symptom_volunteered": "no",
-      "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works."
+      "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
     },
     "evidence": []
   },
@@ -101,11 +105,13 @@
         "structured_result": {
           "reached_patient": "yes",
           "continued_after_ai_disclosure": "yes",
-          "attendance_intent": "cannot_attend",
-          "chosen_slot_id": "none",
+          "attendance_intent": "will_attend",
+          "chosen_slot_id": "s2",
           "barrier": "transport",
           "symptom_volunteered": "no",
-          "evidence_summary": "No lift to the clinic since the bus route changed; neither offered time helps."
+          "evidence_summary": "No bus since the route changed. Accepted a taxi voucher and took the Tuesday morning slot.",
+          "concession_offered": "taxi_voucher",
+          "concession_accepted": "yes"
         },
         "attempts": [
           {
@@ -145,7 +151,17 @@
               {
                 "offset_seconds": 42,
                 "speaker": "bot",
-                "text": "Understood, I will not book anything. A clinician can call you back to talk it through if that would help. Thank you for your time."
+                "text": "I understand, the journey is the problem rather than the time. The clinic can arrange a taxi voucher for each session. Would that help?"
+              },
+              {
+                "offset_seconds": 50,
+                "speaker": "user",
+                "text": "Oh \u2014 yes, that would actually make a difference."
+              },
+              {
+                "offset_seconds": 56,
+                "speaker": "bot",
+                "text": "Then I will book Tuesday the eighteenth at half past nine and arrange the voucher. Please bring shorts and your exercise sheet."
               }
             ],
             "failure_code": null,
@@ -157,11 +173,13 @@
     "structured_result": {
       "reached_patient": "yes",
       "continued_after_ai_disclosure": "yes",
-      "attendance_intent": "cannot_attend",
-      "chosen_slot_id": "none",
+      "attendance_intent": "will_attend",
+      "chosen_slot_id": "s2",
       "barrier": "transport",
       "symptom_volunteered": "no",
-      "evidence_summary": "No lift to the clinic since the bus route changed; neither offered time helps."
+      "evidence_summary": "No bus since the route changed. Accepted a taxi voucher and took the Tuesday morning slot.",
+      "concession_offered": "taxi_voucher",
+      "concession_accepted": "yes"
     },
     "evidence": []
   },
@@ -188,7 +206,9 @@
           "chosen_slot_id": "unknown",
           "barrier": "health_concern",
           "symptom_volunteered": "yes",
-          "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely."
+          "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
         },
         "attempts": [
           {
@@ -244,7 +264,9 @@
       "chosen_slot_id": "unknown",
       "barrier": "health_concern",
       "symptom_volunteered": "yes",
-      "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely."
+      "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
     },
     "evidence": []
   },
@@ -302,7 +324,9 @@
           "chosen_slot_id": "none",
           "barrier": "feels_better",
           "symptom_volunteered": "no",
-          "evidence_summary": "Considers the course done and would like that confirmed by a person."
+          "evidence_summary": "Considers the course done and would like that confirmed by a person.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
         },
         "attempts": [
           {
@@ -358,7 +382,9 @@
       "chosen_slot_id": "none",
       "barrier": "feels_better",
       "symptom_volunteered": "no",
-      "evidence_summary": "Considers the course done and would like that confirmed by a person."
+      "evidence_summary": "Considers the course done and would like that confirmed by a person.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
     },
     "evidence": []
   }

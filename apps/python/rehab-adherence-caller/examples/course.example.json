@@ -11,8 +11,53 @@
     "lapse_after_days": 21,
     "bring": "shorts and your exercise sheet",
     "offered_slots": [
-      { "id": "s1", "label": "Thursday 13 August, 2:00pm", "date": "2026-08-13" },
-      { "id": "s2", "label": "Tuesday 18 August, 9:30am", "date": "2026-08-18" }
+      {
+        "id": "s1",
+        "label": "Thursday 13 August, 2:00pm",
+        "date": "2026-08-13"
+      },
+      {
+        "id": "s2",
+        "label": "Tuesday 18 August, 9:30am",
+        "date": "2026-08-18"
+      }
+    ],
+    "concessions": [
+      {
+        "id": "evening_group",
+        "tier": 1,
+        "offer": "a place in the Wednesday evening group at 6pm",
+        "when": [
+          "work_or_childcare"
+        ]
+      },
+      {
+        "id": "taxi_voucher",
+        "tier": 2,
+        "offer": "a taxi voucher the clinic can arrange for each session",
+        "when": [
+          "transport",
+          "cost"
+        ]
+      },
+      {
+        "id": "phone_review",
+        "tier": 3,
+        "offer": "a phone review with a clinician instead of attending in person",
+        "when": [
+          "transport",
+          "work_or_childcare",
+          "cost"
+        ]
+      },
+      {
+        "id": "pause_two_weeks",
+        "tier": 4,
+        "offer": "pausing the course for two weeks and restarting without losing their place",
+        "when": [
+          "any"
+        ]
+      }
     ]
   },
   "contact_policy": {
@@ -27,13 +72,34 @@
       "phone_e164": "+15550101001",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-14", "status": "attended" },
-        { "date": "2026-07-16", "status": "attended" },
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-07-23", "status": "attended" },
-        { "date": "2026-07-28", "status": "attended" },
-        { "date": "2026-07-30", "status": "attended" },
-        { "date": "2026-08-06", "status": "missed" }
+        {
+          "date": "2026-07-14",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-16",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-30",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
       ],
       "contact_log": []
     },
@@ -43,8 +109,14 @@
       "phone_e164": "+15550101002",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-08-04", "status": "attended" },
-        { "date": "2026-08-06", "status": "missed" }
+        {
+          "date": "2026-08-04",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
       ],
       "contact_log": []
     },
@@ -54,11 +126,26 @@
       "phone_e164": "+15550101003",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-07-23", "status": "attended" },
-        { "date": "2026-07-28", "status": "attended" },
-        { "date": "2026-08-04", "status": "missed" },
-        { "date": "2026-08-06", "status": "missed" }
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
       ],
       "contact_log": []
     },
@@ -68,12 +155,25 @@
       "phone_e164": "+15550101004",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-07-23", "status": "attended" },
-        { "date": "2026-08-04", "status": "missed" }
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
       ],
       "contact_log": [
-        { "date": "2026-07-30", "outcome": "promised_return", "promised_date": "2026-08-04" }
+        {
+          "date": "2026-07-30",
+          "outcome": "promised_return",
+          "promised_date": "2026-08-04"
+        }
       ]
     },
     {
@@ -82,9 +182,18 @@
       "phone_e164": "+15550101005",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-07", "status": "attended" },
-        { "date": "2026-07-09", "status": "attended" },
-        { "date": "2026-07-14", "status": "missed" }
+        {
+          "date": "2026-07-07",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-09",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-14",
+          "status": "missed"
+        }
       ],
       "contact_log": []
     },
@@ -94,13 +203,28 @@
       "phone_e164": "+15550101006",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-07-23", "status": "attended" },
-        { "date": "2026-07-28", "status": "attended" },
-        { "date": "2026-08-04", "status": "missed" }
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
       ],
       "contact_log": [
-        { "date": "2026-08-04", "outcome": "stopped_feels_better" }
+        {
+          "date": "2026-08-04",
+          "outcome": "stopped_feels_better"
+        }
       ]
     },
     {
@@ -109,9 +233,18 @@
       "phone_e164": "+15550101007",
       "consent_to_automated_contact": false,
       "sessions": [
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-08-04", "status": "missed" },
-        { "date": "2026-08-06", "status": "missed" }
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
       ],
       "contact_log": []
     },
@@ -121,10 +254,22 @@
       "phone_e164": "+15550101008",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-28", "status": "attended" },
-        { "date": "2026-07-30", "status": "attended" },
-        { "date": "2026-08-04", "status": "attended" },
-        { "date": "2026-08-06", "status": "attended" }
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-30",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "attended"
+        }
       ],
       "contact_log": []
     },
@@ -134,11 +279,20 @@
       "phone_e164": "+15550101009",
       "consent_to_automated_contact": true,
       "sessions": [
-        { "date": "2026-07-21", "status": "attended" },
-        { "date": "2026-08-04", "status": "missed" }
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
       ],
       "contact_log": [
-        { "date": "2026-07-28", "outcome": "refused_contact" }
+        {
+          "date": "2026-07-28",
+          "outcome": "refused_contact"
+        }
       ]
     }
   ]

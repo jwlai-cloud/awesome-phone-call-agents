@@ -12,7 +12,7 @@ from datetime import date
 from typing import Any
 
 from .calle import CallPort
-from .decide import Decision, Interpretation, decide, interpret
+from .decide import Decision, Interpretation, decide, interpret, recommend
 from .goal import build_result_schema, build_task, idempotency_key, reference
 from .model import CourseFile, mask_phone
 
@@ -37,6 +37,9 @@ class Row:
     simulated: bool | None = None
     reference: str | None = None
     transcript: list[dict[str, str]] | None = None
+    concession_spent: str | None = None
+    barrier: str | None = None
+    recommendation: str | None = None
     signals: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -103,7 +106,10 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
     rows: list[Row] = []
     for decision, row in plan(course_file, today):
         if not decision.will_call:
-            rows.append(row)
+            rows.append(
+                Row(**{**row.to_dict(), "blockers": tuple(row.blockers),
+                       "recommendation": recommend(decision.trajectory, None, None, None)})
+            )
             continue
 
         arguments = build_call_arguments(course_file, decision.patient_id, decision)
@@ -129,12 +135,19 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
             course_file.course,
             result.get("evidence"),
         )
+        structured = result.get("structured_result") or {}
+        barrier = structured.get("barrier") if isinstance(structured, dict) else None
         rows.append(
             Row(
                 **{
                     **row.to_dict(),
                     "blockers": tuple(row.blockers),
                     "called": True,
+                    "barrier": barrier,
+                    "concession_spent": reading.concession_spent,
+                    "recommendation": recommend(
+                        decision.trajectory, reading.outcome, barrier, reading.concession_spent
+                    ),
                     "status": result.get("status"),
                     "outcome": reading.outcome,
                     "promised_date": reading.promised_date.isoformat() if reading.promised_date else None,

@@ -103,6 +103,59 @@ class Slot:
         )
 
 
+# Barriers a concession can answer. Matches the result schema's `barrier` enum,
+# plus "any" for a remedy the clinician allows regardless of the reason.
+BARRIERS = {
+    "transport",
+    "cost",
+    "work_or_childcare",
+    "feels_better",
+    "health_concern",
+    "other",
+    "any",
+}
+
+
+@dataclass(frozen=True)
+class Concession:
+    """Something the clinic authorises the caller to offer, and only that.
+
+    Borrowed from `hungrycall-cascade`: a concession is an authorisation, not a
+    hint. The caller may not invent a remedy, may not offer one out of order, and
+    may not offer one at all until the barrier is known. Whatever it spends is
+    recorded, so the clinic can see what keeping that patient cost.
+    """
+
+    id: str
+    tier: int
+    offer: str
+    when: tuple[str, ...]
+
+    def answers(self, barrier: str | None) -> bool:
+        return "any" in self.when or (barrier is not None and barrier in self.when)
+
+    @staticmethod
+    def parse(raw: Any, index: int) -> "Concession":
+        if not isinstance(raw, dict):
+            raise InputError(f"course.concessions[{index}] must be an object")
+        when_raw = raw.get("when", ["any"])
+        if not isinstance(when_raw, list) or not when_raw:
+            raise InputError(f"course.concessions[{index}].when must be a non-empty list")
+        when = tuple(_text(w, f"course.concessions[{index}].when[]", maximum=32) for w in when_raw)
+        for value in when:
+            if value not in BARRIERS:
+                raise InputError(
+                    f"course.concessions[{index}].when has unknown barrier {value!r}; "
+                    f"allowed: {sorted(BARRIERS)}"
+                )
+        return Concession(
+            id=_text(raw.get("id"), f"course.concessions[{index}].id", maximum=32),
+            tier=_int(raw.get("tier"), f"course.concessions[{index}].tier", minimum=1, maximum=9),
+            offer=_text(raw.get("offer"), f"course.concessions[{index}].offer", maximum=160),
+            when=when,
+        )
+
+
 @dataclass(frozen=True)
 class Course:
     id: str
@@ -111,6 +164,7 @@ class Course:
     lapse_after_days: int
     offered_slots: tuple[Slot, ...]
     bring: str
+    concessions: tuple[Concession, ...] = ()
 
     @staticmethod
     def parse(raw: Any) -> "Course":
@@ -122,6 +176,18 @@ class Course:
         slots = tuple(Slot.parse(item, index) for index, item in enumerate(slots_raw))
         if len({slot.id for slot in slots}) != len(slots):
             raise InputError("course.offered_slots ids must be unique")
+        concessions_raw = raw.get("concessions", [])
+        if not isinstance(concessions_raw, list):
+            raise InputError("course.concessions must be a list")
+        concessions = tuple(
+            sorted(
+                (Concession.parse(item, i) for i, item in enumerate(concessions_raw)),
+                key=lambda c: c.tier,
+            )
+        )
+        if len({c.id for c in concessions}) != len(concessions):
+            raise InputError("course.concessions ids must be unique")
+
         return Course(
             id=_text(raw.get("id"), "course.id", maximum=40),
             programme=_text(raw.get("programme"), "course.programme", maximum=80),
@@ -131,6 +197,7 @@ class Course:
             ),
             offered_slots=slots,
             bring=_text(raw.get("bring"), "course.bring", maximum=120),
+            concessions=concessions,
         )
 
 

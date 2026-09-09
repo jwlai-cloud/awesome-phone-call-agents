@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 59 tests, no credentials, no network
+python3 -m pytest -q                       # 66 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -142,6 +142,53 @@ them. The test caught it.)
 **"Said yes, then did not come" is a first-class state.** It is the most common
 real outcome of a rebooking call, and the response is not to place the same call
 again — it goes to a human.
+
+## Negotiation, within what the clinic authorised
+
+Asking why someone cannot attend is only useful if the caller can do something
+about the answer. It can — but only what the clinic granted it, in the order the
+clinic set, and never something it invented.
+
+| Tier | Offer | Answers |
+| --- | --- | --- |
+| 1 | a place in the Wednesday evening group at 6pm | work or childcare |
+| 2 | a taxi voucher the clinic can arrange | transport, cost |
+| 3 | a phone review with a clinician instead of attending | transport, work, cost |
+| 4 | pausing the course two weeks without losing their place | any |
+
+Borrowed from [`hungrycall-cascade`](../hungrycall-cascade/), whose insight is
+that **a concession is an authorisation, not a hint**. The caller offers one at a
+time, stops as soon as one is accepted, and moves down a tier only after the one
+above is declined. If the person asks for something not on the list, the answer
+is that the clinic will call them back — never an improvised offer.
+
+**What it cost is recorded.** A booking that needed tier 2 is not the same
+result as a booking that needed nothing, and a clinic budgeting taxi vouchers
+needs to know which it got:
+
+```text
+2. p_omar  +15*******02  ->  early_slip / call_blocker_and_rebook
+     offered: taxi_voucher
+     NEXT: booked, but it cost the taxi_voucher offer; note it against the course budget
+     result: status=COMPLETED outcome=promised_return
+     note: booked Tuesday 18 August, 9:30am after offering tier 2: a taxi voucher
+```
+
+**An offer the clinic never granted is discarded, not recorded.** If the caller
+reports spending something outside the ladder, the ledger refuses it — the
+ledger is the clinic's account of what it spent, and an invented entry would
+corrupt it. The transcript still holds whatever was actually said.
+
+**A discharge-confirm call never negotiates.** Someone who has said they are
+finished is not bargained with; only the two rebooking calls carry the ladder.
+
+## What the clinician should do next
+
+Every row carries one recommended next step, derived from the trajectory, the
+outcome, the barrier and what was spent. It is deterministic, and deliberately
+narrow: *arrange transport* is logistics, *review their symptoms* is assessment
+and does not appear. A clinician reading twenty rows should not have to
+re-derive what to do about each one.
 
 ## The gate
 
