@@ -43,6 +43,14 @@ _ASK_BY_ACTION = {
         "Offer these times and book one: {slots}. "
         "Do not ask why they missed it."
     ),
+    # Kept deliberately short. A longer, richer version of this instruction --
+    # read the barrier back, confirm understanding, ask what would work before
+    # offering -- was tried on a live call and made the caller markedly worse: it
+    # filled forty seconds with "Okay", "No rush", "I'll hold" before introducing
+    # itself, misheard "the bus route" as "the clinic's password system", and
+    # never reached the offer at all. The same patient on the shorter instruction
+    # booked successfully. Instructions compete for the model's attention; adding
+    # them buys less than it costs. See docs/adr/0003.
     "call_blocker_and_rebook": (
         "Say {name} has missed some sessions recently. "
         "Ask one open question about what is making it hard to attend, and listen. "
@@ -156,13 +164,23 @@ def build_task(clinic: Clinic, course: Course, patient: Patient, decision: Decis
     if ask is None:
         raise ValueError(f"{decision.action} is not a calling action; no task exists for it")
     slots = "; ".join(f"{slot.id} = {slot.label}" for slot in course.offered_slots)
+    signals = decision.signals
+    ask_values = {
+        "name": patient.first_name,
+        "slots": slots,
+        "attended": signals.attended,
+        "missed": signals.consecutive_missed or signals.missed,
+        "days_since": signals.days_since_last_attended
+        if signals.days_since_last_attended is not None
+        else "some time",
+    }
     parts = [
         _DISCLOSURE.format(
             clinic=clinic.name,
             reference=spoken_reference(reference(clinic, course, patient)),
             callback=clinic.public_callback_number,
         ),
-        ask.format(name=patient.first_name, slots=slots),
+        ask.format(**ask_values),
         *(
             [_CONCESSIONS.format(ladder=concession_ladder(course))]
             if course.concessions and decision.action in _NEGOTIATING_ACTIONS
