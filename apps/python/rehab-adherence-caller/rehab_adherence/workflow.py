@@ -124,7 +124,10 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
             continue
 
         reading: Interpretation = interpret(
-            result.get("status") or "", result.get("structured_result"), course_file.course
+            result.get("status") or "",
+            result.get("structured_result"),
+            course_file.course,
+            result.get("evidence"),
         )
         rows.append(
             Row(

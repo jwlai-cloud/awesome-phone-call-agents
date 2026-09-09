@@ -510,3 +510,70 @@ def test_idempotency_key_changes_when_the_request_changes(raw: dict) -> None:
     reslotted = json.loads(json.dumps(raw))
     reslotted["course"]["offered_slots"][0]["label"] = "Friday 21 August, 4:00pm"
     assert key_for(reslotted) != baseline, "different offered times are a different request"
+
+
+def test_voicemail_is_told_nothing_clinical(course_file: CourseFile) -> None:
+    """Regression from a real call. It went to voicemail and the caller
+    volunteered "about arranging attendance after one missed session", which tells
+    anyone who plays the message back that this person is a cardiac rehab patient
+    who has been missing appointments.
+
+    A voicemail is not a private channel. Name, clinic, callback number.
+    """
+    for decision, _ in plan(course_file, TODAY):
+        if not decision.will_call:
+            continue
+        patient = next(p for p in course_file.patients if p.id == decision.patient_id)
+        task = build_task(course_file.clinic, course_file.course, patient, decision)
+        assert "If you reach voicemail" in task
+        assert "do not explain why you are calling" in task
+        for forbidden in ("missed sessions, or health", "the programme"):
+            assert forbidden in task, "the voicemail rule must name what is off limits"
+
+
+def test_voicemail_is_detected_when_the_status_says_completed(course_file: CourseFile) -> None:
+    """CALL-E reported a voicemail as status "completed" with reached_patient
+    "no". Reading status alone recorded it as no_answer, losing the distinction
+    between "a message was left" and "nothing was communicated"."""
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "no",
+            "continued_after_ai_disclosure": "unknown",
+            "attendance_intent": "unknown",
+            "chosen_slot_id": "none",
+            "barrier": "unknown",
+            "symptom_volunteered": "no",
+            "evidence_summary": "Voicemail said he was on the phone and asked the caller to leave a message.",
+        },
+        course_file.course,
+        evidence=[
+            "The call reached a voicemail message saying the recipient was on another call.",
+            "A short message was left, but no live conversation occurred.",
+        ],
+    )
+    assert reading.outcome == "voicemail", "a voicemail is not a plain no_answer"
+
+
+def test_a_genuine_no_answer_is_still_a_no_answer(course_file: CourseFile) -> None:
+    """The voicemail heuristic reads free text, so it must not swallow every
+    unreached call."""
+    from rehab_adherence.decide import interpret
+
+    reading = interpret(
+        "completed",
+        {
+            "reached_patient": "no",
+            "continued_after_ai_disclosure": "unknown",
+            "attendance_intent": "unknown",
+            "chosen_slot_id": "none",
+            "barrier": "unknown",
+            "symptom_volunteered": "no",
+            "evidence_summary": "Someone else answered and hung up.",
+        },
+        course_file.course,
+        evidence=["The call was answered briefly and ended."],
+    )
+    assert reading.outcome == "no_answer"

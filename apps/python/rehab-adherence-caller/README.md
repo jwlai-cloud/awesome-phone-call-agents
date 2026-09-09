@@ -51,7 +51,7 @@ Python 3.11 or newer. No dependencies.
 
 ```bash
 cd apps/python/rehab-adherence-caller
-python3 -m pytest -q                       # 55 tests, no credentials, no network
+python3 -m pytest -q                       # 59 tests, no credentials, no network
 python3 -m rehab_adherence preview --course examples/course.example.json --today 2026-08-11
 ```
 
@@ -187,6 +187,16 @@ Results are read conservatively:
   slot — so it becomes `identity_unconfirmed` and goes to a human.
 - **`unknown` is not `no`.** Only an explicit `"no"` means the patient was not
   reached.
+- **A voicemail is not a private channel.** If the call reaches an answering
+  machine, or anyone who is not the patient, the caller says only who the message
+  is for, which clinic, and the callback number. Not the programme, not that a
+  session was missed, not anything clinical. A real call went to voicemail and
+  volunteered "about arranging attendance after one missed session" — which tells
+  whoever plays it back that this person is a cardiac rehab patient who has been
+  missing appointments.
+- **A voicemail is detected from the post-call evidence, not the status.** CALL-E
+  reports an answering machine as `status: "completed"`, so status alone cannot
+  tell a voicemail from a refusal.
 - **A terminal status is not a finalised result.** `wait_for_result` can return
   `completed` while the post-call summary is still null. The client re-reads once
   before recording an outcome; without that, a completed booking was written down

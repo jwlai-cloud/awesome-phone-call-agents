@@ -58,6 +58,22 @@ _ASK_BY_ACTION = {
     ),
 }
 
+# What may be said to a machine. A voicemail can be played by anyone in the
+# household, so it carries no clinical context at all -- not the programme, not
+# that a session was missed, not why the clinic is calling. Name, clinic, number.
+#
+# This exists because a real call went to voicemail and the caller volunteered
+# "about arranging attendance after one missed session", which tells whoever
+# plays it back that this person is a cardiac rehab patient who has been missing
+# appointments.
+_VOICEMAIL = (
+    "If you reach voicemail, an answering machine, or anyone who is not {name}, "
+    "do not explain why you are calling. Do not mention the programme, the clinic's "
+    "specialty, appointments, missed sessions, or health of any kind. "
+    "Say only: this is a message for {name} from {clinic}, please call {callback}. "
+    "Then end the call. "
+)
+
 _BOUNDARY = (
     "You are arranging attendance only. You must not give or discuss any medical, "
     "diagnostic, treatment, medication, or exercise advice, and you must not ask how the person "
@@ -123,6 +139,11 @@ def build_task(clinic: Clinic, course: Course, patient: Patient, decision: Decis
             callback=clinic.public_callback_number,
         ),
         ask.format(name=patient.first_name, slots=slots),
+        _VOICEMAIL.format(
+            name=patient.first_name,
+            clinic=clinic.name,
+            callback=clinic.public_callback_number,
+        ),
         _BOUNDARY.format(bring=course.bring),
     ]
     return " ".join(parts)

@@ -241,7 +241,20 @@ class Interpretation:
     note: str
 
 
-def interpret(status: str, structured: dict | None, course: Course) -> Interpretation:
+def _looks_like_voicemail(structured: dict | None, evidence: list | None) -> bool:
+    """CALL-E reports a voicemail as status "completed", not "VOICEMAIL", so the
+    status alone cannot distinguish an answering machine from a real refusal.
+    The post-call evidence names it explicitly."""
+    haystack = " ".join(
+        [str(e) for e in (evidence or [])]
+        + [str((structured or {}).get("evidence_summary", ""))]
+    ).lower()
+    return "voicemail" in haystack or "answering machine" in haystack
+
+
+def interpret(
+    status: str, structured: dict | None, course: Course, evidence: list | None = None
+) -> Interpretation:
     """Map one CALL-E result onto the next contact-log entry.
 
     Conservative by construction: anything unclear becomes `undecided`, never a
@@ -249,8 +262,10 @@ def interpret(status: str, structured: dict | None, course: Course) -> Interpret
     """
     upper = (status or "").upper()
 
-    if upper == "VOICEMAIL":
-        return Interpretation("voicemail", None, False, "voicemail reached; no answer treated as no reply")
+    if upper == "VOICEMAIL" or _looks_like_voicemail(structured, evidence):
+        return Interpretation(
+            "voicemail", None, False, "voicemail reached; a message was left, no reply received"
+        )
     if upper in _TERMINAL_NOT_REACHED:
         return Interpretation("no_answer", None, False, f"not reached ({upper})")
     if not isinstance(structured, dict):
