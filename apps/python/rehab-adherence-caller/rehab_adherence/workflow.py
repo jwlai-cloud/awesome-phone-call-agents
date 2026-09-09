@@ -39,6 +39,8 @@ class Row:
     transcript: list[dict[str, str]] | None = None
     concession_spent: str | None = None
     barrier: str | None = None
+    evidence_summary: str | None = None
+    confidence: float | None = None
     recommendation: str | None = None
     signals: dict[str, Any] | None = None
 
@@ -145,6 +147,10 @@ def run(course_file: CourseFile, today: date, port: CallPort) -> list[Row]:
                     "called": True,
                     "barrier": barrier,
                     "concession_spent": reading.concession_spent,
+                    "evidence_summary": (
+                        structured.get("evidence_summary") if isinstance(structured, dict) else None
+                    ),
+                    "confidence": result.get("completion_confidence"),
                     "recommendation": recommend(
                         decision.trajectory, reading.outcome, barrier, reading.concession_spent
                     ),

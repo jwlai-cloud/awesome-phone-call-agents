@@ -33,6 +33,9 @@ def render(rows: list[Row], *, banner: str, course_id: str, today: str) -> str:
             "calls={calls_made}".format(**signals)
         )
 
+        if row.evidence_summary:
+            for i, line in enumerate(_wrap(row.evidence_summary, 62)):
+                lines.append(f"     {'said:' if i == 0 else '     '} {line}")
         if row.concession_spent:
             lines.append(f"     offered: {row.concession_spent}")
         if row.recommendation and row.recommendation != "no action needed":

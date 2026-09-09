@@ -705,3 +705,21 @@ def test_a_volunteered_symptom_recommends_a_clinician_and_no_rebooking() -> None
     text = recommend("disengaging", "symptom_reported", "health_concern", None)
     assert "clinician" in text
     assert "do not rebook" in text
+
+
+def test_the_ledger_keeps_the_note_the_call_produced(course_file: CourseFile, tmp_path: Path) -> None:
+    """CALL-E writes a one-line summary of what was actually said. Extracting the
+    barrier from it and then discarding the sentence leaves a clinician with a
+    category and no words behind it."""
+    responses = json.loads(RESPONSES.read_text(encoding="utf-8"))
+    rows = run(course_file, TODAY, FixturePort(responses))
+    omar = next(r for r in rows if r.patient_id == "p_omar")
+    assert omar.evidence_summary, "the call's own note must survive into the ledger"
+    assert "taxi voucher" in omar.evidence_summary
+
+    output = tmp_path / "l.jsonl"
+    write_jsonl(output, rows)
+    written = output.read_text(encoding="utf-8")
+    assert "taxi voucher" in written
+    for patient in course_file.patients:
+        assert patient.phone_e164 not in written, "notes must not reintroduce a number"
